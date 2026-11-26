@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {RAW,cacheFrom,compareSnapshots,verify,validCache,mapTx,crossCheck,sync,packTransaction,unpackTransaction} from "../docs/analytics.mjs";
+import {RAW,cacheFrom,compareSnapshots,verify,validCache,mapTx,crossCheck,sync,auditTrust,mergeAudit,auditResult,packTransaction,unpackTransaction} from "../docs/analytics.mjs";
 const hash=i=>String(i).padStart(64,"0");
 const t=[1,2,3].map(i=>({h:hash(i),lt:String(i),prev:String(i-1),prevHash:hash(i-1),t:100+i,success:true,m:null}));
 const c=cacheFrom(t,"toncenter"),other=cacheFrom(t,"tonapi");
@@ -47,4 +47,18 @@ try{
  globalThis.fetch=async()=>({ok:true,json:async()=>({transactions:[newer,...t.slice().reverse()].map(x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true}))})});
  assert.equal((await crossCheck(c)).status,"match");
 }finally{globalThis.fetch=originalFetch}
+// Trust and concurrency: a legacy match is not a full-history match.
+const match={...auditResult(c,"match"),asOf:Date.now()-4000};
+const mismatch={...auditResult(c,"mismatch"),asOf:Date.now()-3000};
+const unavailable={...auditResult(c,"unavailable"),asOf:Date.now()-2000};
+assert.equal(auditTrust({...c,audit:{status:"match",tip:c.tip,asOf:match.asOf}}),"unavailable");
+assert.equal(auditTrust({...c,audit:match}),"match");
+assert.equal(auditTrust({...c,audit:mismatch}),"mismatch");
+assert.equal(mergeAudit({...c,audit:mismatch},unavailable).status,"mismatch");
+assert.equal(mergeAudit({...c,audit:mismatch},match).status,"mismatch");
+assert.equal(mergeAudit({...c,audit:mismatch},{...match,asOf:Date.now()-1000}).status,"match");
+const advanced=cacheFrom([{h:hash(4),lt:"4",prev:"3",prevHash:hash(3),t:104,success:true,m:null}],"toncenter",c);
+assert.equal(auditTrust({...advanced,audit:match}),"prior");
+assert.equal(auditTrust({...advanced,audit:mergeAudit(advanced,mismatch)}),"mismatch");
+assert.equal(auditTrust({...c,audit:{...match,tipHash:hash(9)}}),"unavailable");
 console.log("P1 identity regression checks passed");
