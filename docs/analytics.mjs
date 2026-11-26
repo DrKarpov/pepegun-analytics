@@ -68,6 +68,18 @@ function validHistory(c){
  return prev===c.tip&&c.history.at(-1)?.[1]===c.tipHash&&c.rows.every(row=>byLt.get(row.lt)===row.h);
 }
 function sameHistory(a,b){return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every(([lt,h],i)=>lt===b[i][0]&&h===b[i][1])}
+export function historyConflict(a,b){
+ if(!a||!b)return false;
+ if(a.tip===b.tip&&a.tipHash!==b.tipHash)return true;
+ if(!Array.isArray(a.history)||!Array.isArray(b.history))return false;
+ const n=Math.min(a.history.length,b.history.length);
+ for(let i=0;i<n;i++)if(a.history[i][0]!==b.history[i][0]||a.history[i][1]!==b.history[i][1])return true;
+ return false;
+}
+function overlapConflict(previous,txs){
+ const known=new Map(previous.history||[[previous.tip,previous.tipHash]]);
+ return txs.some(t=>known.has(t.lt)&&known.get(t.lt)!==t.h);
+}
 
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 async function json(url,progress){
@@ -157,29 +169,40 @@ export function cacheFrom(txs,source,previous=null,now=Date.now()){
  return {version:VERSION,address:RAW,source,...(history?{history}:{}),tip:txs.at(-1)?.lt||previous?.tip,tipHash:txs.at(-1)?.h||previous?.tipHash,tipTime:txs.at(-1)?.t||previous?.tipTime,audit:previous?.audit??null,firstTime:previous?.firstTime??txs[0]?.t,asOf:now,scanned:(previous?.scanned||0)+txs.length,ambiguous:(previous?.ambiguous||0)+txs.filter(t=>t.a===true||(commentKind(t.m?.c)?.k==="ambiguous"&&t.success&&t.m?.s&&t.m.s!==RAW&&!t.m.b&&BigInt(t.m.v)>0n)).length,rows:[...m.values()].sort((a,b)=>a.t-b.t||compareLt(a.lt,b.lt))};
 }
 export async function sync(previous,progress,force=false){
- let last;
+ let last,disagreement=null;
+ const conflict=message=>Object.assign(Error(message),{sourceMismatch:true});
+ const retain=next=>({...next,audit:mergeAudit(next,disagreement)});
  for(const source of ["toncenter","tonapi"]){
   try{
    if(!force&&validCache(previous)&&previous.history){
     const all=await download(source,previous.tip,progress),fresh=all.filter(t=>compareLt(t.lt,previous.tip)>0);
+    if(overlapConflict(previous,all))throw conflict("Indexer disagrees at cached tip");
     if(fresh.length){
      const anchors=all.filter(t=>t.lt===previous.tip);
-     if(anchors.length>1||anchors.some(t=>t.h!==previous.tipHash))throw Error("Indexer disagrees at cached tip");
+     if(anchors.length>1||anchors.some(t=>t.h!==previous.tipHash))throw conflict("Indexer disagrees at cached tip");
+     if(fresh[0].prev===previous.tip&&fresh[0].prevHash!=null&&fresh[0].prevHash!==previous.tipHash)throw conflict("Indexer disagrees with cached predecessor");
      if((anchors.length===1||fresh[0].prevHash===previous.tipHash)&&verify(fresh,previous.tip,previous.tipHash)){
-      const next=cacheFrom(fresh,source,previous);if(!validCache(next))throw Error("Invalid incremental snapshot");return next;
+      const next=cacheFrom(fresh,source,previous);if(!validCache(next))throw Error("Invalid incremental snapshot");return retain(next);
      }
     }
     if(!fresh.length){
      const head=await getPage(source,null,null,1,progress);
-     if(head.length===1&&head[0].lt===previous.tip&&head[0].h===previous.tipHash)return cacheFrom([],source,previous);
+     if(overlapConflict(previous,head))throw conflict("Indexer disagrees at cached head");
+     if(head.length===1&&head[0].lt===previous.tip&&head[0].h===previous.tipHash)return retain(cacheFrom([],source,previous));
     }
    }
    const txs=await download(source,null,progress);
    if(!verify(txs,"0"))throw Error("Incomplete or empty full history");
-   if(validCache(previous)){const anchor=txs.find(t=>t.lt===previous.tip);if(!anchor||anchor.h!==previous.tipHash)throw Error("Indexer behind or inconsistent with last verified snapshot");if(previous.history&&!sameHistory(previous.history,txs.filter(t=>compareLt(t.lt,previous.tip)<=0).map(t=>[t.lt,t.h])))throw Error("Indexer disagrees with cached history");}
-   const next=cacheFrom(txs,source);if(!validCache(next))throw Error("Invalid full snapshot");if(validCache(previous)&&previous.audit&&typeof previous.audit.tip==="string"&&/^\d+$/.test(previous.audit.tip)&&compareLt(previous.audit.tip,next.tip)<=0)next.audit=previous.audit;return next;
-  }catch(e){last=e}
+   if(validCache(previous)){
+    if(overlapConflict(previous,txs))throw conflict("Indexer disagrees with cached history");
+    const anchor=txs.find(t=>t.lt===previous.tip);
+    if(!anchor){if(compareLt(txs.at(-1).lt,previous.tip)>=0)throw conflict("Indexer omitted cached tip");throw Error("Indexer behind cached snapshot")}
+    if(previous.history&&!sameHistory(previous.history,txs.filter(t=>compareLt(t.lt,previous.tip)<=0).map(t=>[t.lt,t.h])))throw conflict("Indexer disagrees with cached history");
+   }
+   const next=cacheFrom(txs,source);if(!validCache(next))throw Error("Invalid full snapshot");if(validCache(previous)&&previous.audit&&typeof previous.audit.tip==="string"&&/^\d+$/.test(previous.audit.tip)&&compareLt(previous.audit.tip,next.tip)<=0)next.audit=previous.audit;return retain(next);
+  }catch(e){last=e;if(e.sourceMismatch&&validCache(previous))disagreement=auditResult(previous,"mismatch",{source})}
  }
+ if(disagreement)throw Object.assign(last||Error("Indexer disagreement"),{audit:disagreement});
  throw last||Error("Both sources unavailable");
 }
 function db(){return new Promise((resolve,reject)=>{const r=indexedDB.open("pepegun-analytics-v2",1);r.onupgradeneeded=()=>r.result.createObjectStore("data");r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
@@ -216,8 +239,9 @@ export function metrics(rows,range,now){
  return {wallets:all.active.size,paying:all.paying.size,newWallets,returning:all.active.size-newWallets,fee:all.fee,count:all.count,other:all.other,largest:all.largest,venues:[...venues].map(([label,a])=>({label,fee:a.fee,count:a.count,wallets:a.active.size})).sort((a,b)=>a.fee>b.fee?-1:a.fee<b.fee?1:a.label.localeCompare(b.label)),activity:Object.fromEntries(Object.entries(activity).map(([k,v])=>[k,v.size])),anchor:dayKey(anchor)};
 }
 export function compareSnapshots(snapshot,other){
+ if(!validCache(snapshot)||!validCache(other))return false;
  const byHash=new Map(other.rows.map(r=>[r.h,r]));
- return validCache(snapshot)&&validCache(other)&&sameHistory(snapshot.history,other.history)&&snapshot.tip===other.tip&&snapshot.tipHash===other.tipHash&&snapshot.scanned===other.scanned&&snapshot.ambiguous===other.ambiguous&&snapshot.rows.length===other.rows.length&&!snapshot.rows.some(r=>{const a=byHash.get(r.h);return !a||["lt","t","s","v","k","d"].some(k=>r[k]!==a[k])});
+ return sameHistory(snapshot.history,other.history)&&snapshot.tip===other.tip&&snapshot.tipHash===other.tipHash&&snapshot.scanned===other.scanned&&snapshot.ambiguous===other.ambiguous&&snapshot.rows.length===other.rows.length&&!snapshot.rows.some(r=>{const a=byHash.get(r.h);return !a||["lt","t","s","v","k","d"].some(k=>r[k]!==a[k])});
 }
 export async function crossCheck(snapshot,progress){
  if(!validCache(snapshot))throw Error("No verified snapshot");
@@ -225,6 +249,7 @@ export async function crossCheck(snapshot,progress){
  if(!snapshot.history)return auditResult(snapshot,"unavailable",{source});
  const txs=await download(source,null,progress);
  const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
+ if(overlapConflict(snapshot,upto))return auditResult(snapshot,"mismatch",{source});
  if(!verify(upto,"0")||upto.at(-1)?.lt!==snapshot.tip)return auditResult(snapshot,"unavailable",{source});
  const other=cacheFrom(upto,source,null,snapshot.asOf);
  return auditResult(snapshot,compareSnapshots(snapshot,other)?"match":"mismatch",{source,scanned:other.scanned,rows:other.rows.length});
