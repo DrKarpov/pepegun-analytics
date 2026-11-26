@@ -2,30 +2,30 @@
 
 Independent on-chain analytics for the Pepegun fee collector on TON.
 
-**[Open dashboard](https://drkarpov.github.io/pepegun-analytics/)**
+[Open dashboard](https://drkarpov.github.io/pepegun-analytics/)
 
 ## Features
 
-- Unique and paying wallets, audience growth and daily, weekly and monthly activity.
-- Fee revenue, payment counts, venue labels and wallet retention.
-- Custom date ranges, CSV and PNG exports, English and Russian interfaces.
-- Automatic refresh every 15 minutes while the dashboard is open.
+- Wallet activity, audience growth and retention
+- Fee revenue and payment statistics
+- Activity by venue label
+- Custom date ranges and CSV/PNG exports
+- English and Russian interfaces
+- Data refresh every 15 minutes while the page is open
 
 ## Data
 
-Public transaction history is retrieved from Toncenter API v3 or TonAPI v2. The dashboard verifies history continuity, deduplicates full wallet addresses and transaction hashes, and retains the last successful snapshot in browser storage.
+Transaction history is retrieved from Toncenter API v3 or TonAPI v2.
 
 [Fee collector on Tonviewer](https://tonviewer.com/UQD-J5lB6VMC1Cyyz2bLEEflmiG0JRXv7fccO6olayRRqWrc)
 
-Wallet counts represent addresses, not individual people. Revenue represents gross incoming transfers labelled as fees, not net profit or a verified count of trades. Calendar periods use UTC.
+Wallet counts represent unique addresses, not individual users. Fee revenue represents gross incoming transfers labelled as fees, not net profit. All calendar periods use UTC.
 
 ## Development
-
-Static HTML, CSS and JavaScript. No build step or API key required.
 
 ```sh
 python3 -m http.server 8000 --directory docs
 node tests/analytics.test.mjs
 ```
 
-Independent community project. Not affiliated with or endorsed by Pepegun.
+This is an independent project, not an official Pepegun product.
