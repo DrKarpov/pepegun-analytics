@@ -1,4 +1,4 @@
-import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,validAudit,validCache,auditTrust,mergeAudit,historyConflict,exact,weekIndex,weekStart} from "./analytics.mjs?v=32";
+import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,validAudit,validCache,auditTrust,mergeAudit,historyConflict,exact,weekIndex,weekStart} from "./analytics.mjs?v=33";
 export function extraMetrics(rows,range,now){
  const to=Math.min(range.to,now+1),from=range.from,firstPay=new Map(),feeValues=[],byWallet=new Map(),newPayers=new Set();let total=0n;
  for(const r of rows){const t=r.t*1000;if(t>=to||r.k!=="fee")continue;if(!firstPay.has(r.s)||firstPay.get(r.s)>t)firstPay.set(r.s,t);if(t<from)continue;const v=BigInt(r.v);feeValues.push(v);total+=v;byWallet.set(r.s,(byWallet.get(r.s)||0n)+v);}
@@ -79,6 +79,10 @@ export function selectSnapshot(local,seed){
 }
 export async function loadSeed(){
  const urls=["https://raw.githubusercontent.com/DrKarpov/pepegun-analytics/main/docs/snapshot.json",new URL("./snapshot.json",import.meta.url)];
- for(const url of urls){const ac=new AbortController(),timer=setTimeout(()=>ac.abort(),5000);try{const r=await fetch(url,{cache:"no-cache",signal:ac.signal});if(r.ok){const seed=validateSeed(await r.json());if(seed)return seed}}catch{}finally{clearTimeout(timer)}}
+ for(const endpoint of urls){
+  const url=new URL(endpoint);url.searchParams.set("fresh",String(Date.now()));
+  const ac=new AbortController(),timer=setTimeout(()=>ac.abort(),5000);
+  try{const r=await fetch(url,{cache:"no-store",signal:ac.signal});if(r.ok){const seed=validateSeed(await r.json());if(seed)return seed}}catch{}finally{clearTimeout(timer)}
+ }
  return null;
 }
