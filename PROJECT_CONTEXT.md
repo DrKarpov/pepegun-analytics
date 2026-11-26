@@ -60,3 +60,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v26 scroll-safe long press
 - Touch feedback starts only after 240ms stationary contact, export still opens after 600ms total. Movement of 8 CSS pixels or more, scrolling, release, cancellation, secondary pointers, window blur and hidden document cancel pending feedback and export. Touch-generated contextmenu cannot bypass the delay. Desktop and keyboard export unchanged.
+
+## v27 translucent preview and quieter interface
+- User requested subtle green translucent preview surface, with no visible Preview heading or persistent card export instruction. Preview uses 88% opaque dark green with backdrop blur and solid fallback; PNG itself stays opaque and unchanged. Dialog accessible heading and card aria-description remain available to assistive technology. No tracking, backend or new stored preferences. Hold timing, share/download and analytics unchanged.

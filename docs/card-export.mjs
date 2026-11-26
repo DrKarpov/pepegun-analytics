@@ -79,7 +79,7 @@ export async function renderCardPng(s){
  return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error("PNG unavailable")),"image/png"));
 }
 export function setupCardExport(getMeta,download){
- const dialog=document.getElementById("card-export-menu"),hint=document.getElementById("card-export-hint"),title=document.getElementById("card-export-title"),save=document.getElementById("card-export-download"),share=document.getElementById("card-export-share"),cancel=document.getElementById("card-export-cancel"),status=document.getElementById("card-export-status"),preview=document.getElementById("card-export-preview"),previewFrame=document.getElementById("card-export-preview-frame"),actions=document.getElementById("card-export-actions");
+ const dialog=document.getElementById("card-export-menu"),title=document.getElementById("card-export-title"),save=document.getElementById("card-export-download"),share=document.getElementById("card-export-share"),cancel=document.getElementById("card-export-cancel"),status=document.getElementById("card-export-status"),preview=document.getElementById("card-export-preview"),previewFrame=document.getElementById("card-export-preview-frame"),actions=document.getElementById("card-export-actions");
  const cards=[...document.querySelectorAll("[data-card-export]")];let press=null,feedbackTimer=0,timer=0,serial=0,ready=null,origin=null,previewUrl=null,closing=false,lastPointerType="";
  const FEEDBACK_DELAY=240,HOLD_DELAY=600,MOVE_LIMIT=8;
  const root=document.documentElement;
@@ -90,7 +90,7 @@ export function setupCardExport(getMeta,download){
  const clearHold=()=>{stop();for(const card of cards)card.classList.remove("export-holding")};
  const excluded=target=>!!target.closest("button,a,input,select,textarea,.chart-plot");
  const clearPreview=()=>{previewFrame.hidden=true;preview.width=1;preview.height=1;preview.removeAttribute("aria-label");if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null}};
- function update(){const meta=getMeta(),L=labels[meta.lang];hint.textContent=L.hint;hint.hidden=!meta.valid;for(const card of cards){card.tabIndex=meta.valid&&!card.hidden?0:-1;card.setAttribute("aria-description",L.hint)}}
+ function update(){const meta=getMeta(),L=labels[meta.lang];for(const card of cards){card.tabIndex=meta.valid&&!card.hidden?0:-1;card.setAttribute("aria-description",L.hint)}}
  function close(){
   clearHold();if(!dialog.open||closing)return;closing=true;serial++;ready=null;save.disabled=share.disabled=true;dialog.classList.add("export-closing");
   setTimeout(()=>{if(dialog.open)dialog.close()},window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:160);

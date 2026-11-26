@@ -344,7 +344,6 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 
 
 /* v22: compact preview, animated hold feedback. */
-.card-export-hint{font-size:11px;color:var(--muted);text-align:center;margin:0 0 8px;line-height:1.4}
 [data-card-export]{position:relative;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:transform .22s ease}
 [data-card-export]:focus:not(:focus-visible){outline:none}
 [data-card-export] .chart-tx{-webkit-touch-callout:default}
@@ -388,3 +387,14 @@ html[data-input-mode="pointer"] :is(button,a,input,summary,[tabindex],svg):focus
 #card-export-cancel:focus-visible{outline:none;color:var(--accent)}
 html[data-input-mode="pointer"] #card-export-cancel:focus{color:var(--muted)}
 html[data-input-mode="keyboard"] #card-export-cancel:focus-visible{background:var(--card);color:var(--accent)}
+
+/* v27: subtly translucent green preview, without visible redundant labels. */
+#card-export-menu{background:#1d261d;border-color:#414f48}
+@supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
+ #card-export-menu{background:rgba(29,38,29,.88);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+}
+#card-export-menu::backdrop{background:rgba(0,0,0,.48)}
+.card-export-sheet{gap:8px;padding:10px}
+.card-export-heading{min-height:32px;padding:0}
+#card-export-cancel{top:-6px;right:-4px}
+.card-export-sr-title{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
