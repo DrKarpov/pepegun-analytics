@@ -41,7 +41,7 @@ try{
     const original=CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText=function(...args){window.__canvasText.push(String(args[0]));return original.apply(this,args)};
    });
-   await ctx.route("https://raw.githubusercontent.com/**/snapshot.json",route=>route.fulfill({contentType:"application/json",body:JSON.stringify(seed)}));
+   await ctx.route("https://raw.githubusercontent.com/**/snapshot.json*",route=>route.fulfill({contentType:"application/json",body:JSON.stringify(seed)}));
    await ctx.route("https://toncenter.com/**",route=>{
     const u=new URL(route.request().url());
     if(mode==="mismatch")return ok(route,[tc({...fresh,prevHash:hash(99)})]);
@@ -86,8 +86,8 @@ try{
    // Fresh independent context for the migration/unavailable scenario.
    const migration=await browser.newContext({viewport:{width:393,height:852},locale:"ru-RU"});
    await migration.addInitScript(()=>localStorage.setItem("pepegun-lang","ru"));
-   const legacySeed={...snapshot,audit:{status:"match",tip:cache.tip,asOf:now}};
-   await migration.route("https://raw.githubusercontent.com/**/snapshot.json",route=>route.fulfill({json:legacySeed}));
+   let legacySeed={...snapshot,audit:{status:"match",tip:cache.tip,asOf:now}};
+   await migration.route("https://raw.githubusercontent.com/**/snapshot.json*",route=>route.fulfill({json:legacySeed}));
    await migration.route("https://toncenter.com/**",route=>{
     const u=new URL(route.request().url());
     return ok(route,u.searchParams.has("start_lt")?[]:u.searchParams.get("limit")==="1"?[tc(txs.at(-1))]:txs.slice().reverse().map(tc));
@@ -116,6 +116,20 @@ try{
    assert.equal(await legacyPage.locator("#overview").innerText(),originalMetrics);
    slowAudit=false;
    await legacyPage.locator("#audit-check").click();await waitStatus(legacyPage,"Сверка недоступна");
+   assert.equal(await legacyPage.locator("#notice").isVisible(),false);
+   // The user-reported regression: local unavailable is newer than a verified
+   // publication of the same chain tip. An ordinary refresh must recover.
+   legacySeed={...snapshot,audit:{...snapshot.audit,asOf:now}};
+   await legacyPage.locator("#refresh").click();
+   await legacyPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
+   assert.equal(await legacyPage.locator("#notice").isVisible(),false);
+   assert.equal(await legacyPage.locator("#overview").innerText(),originalMetrics);
+   await legacyPage.reload();
+   await legacyPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
+   // A subsequent unsuccessful retry must not erase the confirmed history.
+   await legacyPage.locator("#method-section summary").click();
+   await legacyPage.locator("#audit-check").click();
+   await legacyPage.waitForFunction(()=>!document.querySelector("#audit-check").disabled&&document.querySelector("#status").className==="status "&&document.querySelector("#audit-result").textContent.includes("Второй индексатор"));
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    await migration.close();
    assert.deepEqual(errors,[]);
