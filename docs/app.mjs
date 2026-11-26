@@ -1,6 +1,6 @@
 import {setupCardExport} from "./card-export.mjs?v=30";
-import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=32";
-import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=32";
+import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=33";
+import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=33";
 const words={
   "en": {
     "subtitle": "Independent on-chain analytics",
@@ -497,7 +497,7 @@ $("method").addEventListener("click",event=>{const button=event.target.closest("
 function renderExtras(){
  const check=cache?.audit,trust=auditTrust(cache);
  const state=auditing&&trust!=="mismatch"?"auditBusy":({match:"auditMatch",prior:"auditMatch",mismatch:"auditMismatch",unavailable:"auditUnavailable",unchecked:"auditIdle"}[trust]);
- $("audit-result").textContent=tr(state)+(check&&!auditing?" · "+time(check.asOf)+(cache&&check.tip!==cache.tip?" · "+tr("auditPrior"):""):"")+(!auditing&&auditOutcome?" · "+tr(auditOutcome):"");
+ $("audit-result").textContent=tr(state)+(check&&!auditing?" · "+time(check.asOf)+(cache&&check.tip!==cache.tip?" · "+tr("auditPrior"):""):"")+(!auditing&&auditOutcome&&auditOutcome!==state?" · "+tr(auditOutcome):"");
  $("audit-result").className="sub "+(state==="auditMismatch"?"audit-warn":"");
  const auditButton=$("audit-check");auditButton.disabled=!cache||Boolean(auditing&&auditController?.signal.aborted);auditButton.classList.toggle("audit-running",auditing);auditButton.setAttribute("aria-busy",String(auditing));auditButton.textContent=tr(auditing?"auditCancel":"auditButton");
  const p=auditProgress;
@@ -510,10 +510,10 @@ async function auditSources(){
  if(!cache)return;
  const snapshot=cache,controller=new AbortController();auditController=controller;auditing=true;auditOutcome=null;auditProgress={source:snapshot.source==="toncenter"?"tonapi":"toncenter",pages:0,scanned:0,retry:false};renderExtras();
  let result;
- try{result=await crossCheck(snapshot,p=>{auditProgress={...auditProgress,...p,retry:!!p.retry};renderExtras()},{signal:controller.signal})}
+ try{result=await crossCheck(snapshot,p=>{auditProgress={...auditProgress,...p,retry:!!p.retry};renderExtras()},{signal:controller.signal});if(result.status==="unavailable")auditOutcome="auditUnavailable"}
  catch(e){
   if(controller.signal.aborted)auditOutcome="auditCancelled";
-  else{if(e.name==="TimeoutError")auditOutcome="auditTimeout";result=auditResult(snapshot,"unavailable")}
+  else{auditOutcome=e.name==="TimeoutError"?"auditTimeout":"auditUnavailable";result=auditResult(snapshot,"unavailable")}
  }finally{
   if(cache&&result)cache={...cache,audit:mergeAudit(cache,result)};
   auditing=false;auditController=null;auditProgress=null;renderExtras();updateStatus();
@@ -575,7 +575,13 @@ async function exportPng(){
 async function refresh(force=false){
  if(busy)return;
  busy=true;error=false;progress=null;exportError=false;updateStatus();
- try{const next=await sync(cache,p=>{progress=p;updateStatus()},force);cache={...next,audit:mergeAudit(next,cache?.audit)};storageError=!(await saveCache(cache));}
+ try{
+  // Recover server-verified history on every refresh, not only on page load.
+  const seed=await loadSeed();
+  if(seed){cache=selectSnapshot(cache,seed);render()}
+  const next=await sync(cache,p=>{progress=p;updateStatus()},force);
+  cache={...next,audit:mergeAudit(next,cache?.audit)};storageError=!(await saveCache(cache));
+ }
  catch(e){error=true;if(cache&&e.audit){cache={...cache,audit:mergeAudit(cache,e.audit)};storageError=!(await saveCache(cache))}console.warn("Pepegun sync:",e)}
  finally{busy=false;render()}
 }
@@ -591,4 +597,4 @@ window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setT
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!busy&&(!cache||Date.now()-cache.asOf>=REFRESH))refresh()});
 setInterval(()=>{if(!busy&&document.visibilityState==="visible")refresh()},REFRESH);setInterval(updateStatus,60000);
 const updateCardExport=setupCardExport(()=>({valid:!!m&&!!cache,lang,period:rangeNote(),asOf:cache?time(cache.asOf):"",anchor:m?.anchor||"",stale:stale(),trust:trustLabel()?tr(trustLabel()):"",suspect:auditTrust(cache)==="mismatch"}),download);
-render();loadCache().then(async c=>{if(c){cache=c;render()}const seed=await loadSeed();cache=selectSnapshot(c,seed);busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});
+render();loadCache().then(c=>{if(c){cache=c;render()}busy=false;refresh()}).catch(()=>{busy=false;refresh()});
