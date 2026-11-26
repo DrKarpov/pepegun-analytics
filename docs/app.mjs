@@ -1,7 +1,5 @@
-import {ADDRESS,DAY,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,amount,exact,csv,sync,loadCache,saveCache} from "./analytics.mjs?v=6";
-import {crossCheck} from "./analytics.mjs?v=6";
-import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed} from "./insights.mjs?v=6";
-
+import {ADDRESS,DAY,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,amount,exact,sync,loadCache,saveCache,crossCheck} from "./analytics.mjs?v=7";
+import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed} from "./insights.mjs?v=7";
 const words={
 en:{
 subtitle:"Independent on-chain analytics",all:"All time",allFilter:"All",d30:"30d",d7:"7d",h24:"24h",custom:"Custom",from:"From (UTC)",to:"To (UTC)",
@@ -11,10 +9,10 @@ loading:"Loading history",refreshing:"Checking for new data",synced:"Synced",sta
 wallets:"Unique wallets",paying:"Paying wallets",revenue:"Fee revenue",payments:"Fee payments",addresses:"Distinct sender addresses",share:"of unique wallets",gross:"Gross incoming fees",avg:"Average fee",active:"Active wallets",windowEnd:"As of",today:"1 day",week:"7 days",month:"30 days",new:"New wallets",returning:"Returning wallets",firstSeen:"First seen in selected period",seenBefore:"Seen before selected period",newShort:"New",returningShort:"Returning",payingShort:"Paying",allShort:"All wallets",fee:"Fees",day:"Date (UTC)",activeShort:"Active",count:"Payments",other:"Other transfers",cum:"Cumulative wallets",cumPay:"Cumulative paying",exactFee:"Exact fee total",largest:"Largest fee",otherValue:"Value of other transfers",prevDay:"Active previous UTC day",noData:"No qualifying data in this period",noHistory:"Waiting for verified blockchain history",noCache:"Could not load verified history. Use refresh to retry.",cachedError:"Refresh failed. Showing the last successful snapshot.",oldCache:"This snapshot is older than 20 minutes. Refresh to update.",retry:"API busy — retrying",downloading:"Fetching transactions",transactions:"transactions",badRange:"Choose valid dates within the available history.",persist:"Browser storage is unavailable. Data is still available for this visit.",noExport:"Could not create the file in this browser.",more:"Show all days",less:"Show latest 14 days",cohort:"First seen",size:"Wallets",asOf:"Data as of",notLive:"As of last successful sync",rolling:"Rolling 24 hours",calendar7:"7 UTC calendar days",calendar30:"30 UTC calendar days",dateRange:"Selected UTC dates",noFee:"No fee payments",weekOf:"Week of",scanned:"Transactions checked",provider:"Data provider",coverage:"History coverage",verified:"Continuous account history",collector:"Fee collector",exportTitle:"Pepegun Analytics",exportNote:"Wallets are addresses, not people. Independent on-chain dashboard.",
 methodItems:[
 "Data comes from the single public fee collector on TON via Toncenter API v3 or TonAPI v2. Every full download must form an unbroken transaction chain back to the account's first transaction.",
-"Counts include successful incoming positive native-currency transfers whose decoded text contains Pepegun; bounced transfers and transfers from the collector itself are excluded. Hashes and complete normalized sender addresses are deduplicated. The comment alone does not prove a trade occurred.",
-"Only comments containing Pepegun fee count as fee payments and gross fee revenue. Other Pepegun transfers, including non-micro amounts, count toward wallet activity but not revenue. Fee payments are not a verified trade count, and gross fees are not profit.",
+"Counts include successful incoming positive native-currency transfers with a recognized Pepegun comment prefix; bounced transfers and transfers from the collector itself are excluded. Hashes and complete normalized sender addresses are deduplicated. The comment alone does not prove a trade occurred.",
+"Only comments with the recognized Pepegun fee prefix count as fee payments and gross fee revenue. Other Pepegun transfers, including non-micro amounts, count toward wallet activity but not revenue. Fee payments are not a verified trade count, and gross fees are not profit.",
 "New wallets first appear in the selected interval. Returning wallets were first seen before it and are active in it. Cumulative totals count distinct addresses since inception. DAU/WAU/MAU are distinct wallets in the 1, 7 and 30 UTC days ending at the selected range end; these windows may extend before the selected range.",
-"All calendar dates are UTC. The 7- and 30-day presets include the current snapshot day and the preceding 6 or 29 days; 6h and 24h are rolling intervals. Incomplete intervals are marked. Cached data is calculated only through its last successful sync.",
+"All calendar dates are UTC. The 7- and 30-day presets include the current snapshot day and the preceding 6 or 29 days; 6h and 24h are rolling intervals. Charts use adaptive UTC intervals; incomplete intervals are marked. Cached data is calculated only through its last successful sync.",
 "Refresh runs on page open, manually, every 15 minutes while the page is open, and when returning to an old tab. The browser retains the last verified history; there is no background server or paid API. Availability depends on public blockchain indexers."]}
 ,ru:{
 subtitle:"Независимая ончейн-аналитика",all:"Всё время",allFilter:"Всё",d30:"30 дн.",d7:"7 дн.",h24:"24 ч.",custom:"Период",from:"От (UTC)",to:"До (UTC)",
@@ -24,13 +22,13 @@ loading:"Загрузка истории",refreshing:"Проверка новы�
 wallets:"Уникальные кошельки",paying:"Платящие кошельки",revenue:"Доход с комиссий",payments:"Платежи комиссий",addresses:"Уникальные адреса",share:"от всех кошельков",gross:"Входящие комиссии",avg:"Средняя комиссия",active:"Активные кошельки",windowEnd:"На",today:"1 день",week:"7 дней",month:"30 дней",new:"Новые кошельки",returning:"Вернувшиеся",firstSeen:"Впервые в выбранном периоде",seenBefore:"Активны и замечены ранее",newShort:"Новые",returningShort:"Повторные",payingShort:"Платящие",allShort:"Все кошельки",fee:"Комиссии",day:"Дата (UTC)",activeShort:"Активные",count:"Платежи",other:"Другие переводы",cum:"Всего кошельков",cumPay:"Всего платящих",exactFee:"Точная сумма комиссий",largest:"Крупнейшая комиссия",otherValue:"Сумма других переводов",prevDay:"Активные за предыдущий день",noData:"Нет подходящих данных за период",noHistory:"Ожидание проверенной истории блокчейна",noCache:"Не удалось загрузить проверенную историю. Нажмите обновление.",cachedError:"Обновление не удалось. Показан последний успешный снимок.",oldCache:"Данные старше 20 минут. Обновите страницу.",retry:"Лимит API — повтор запроса",downloading:"Загрузка транзакций",transactions:"транзакций",badRange:"Выберите корректные даты в пределах истории.",persist:"Хранилище браузера недоступно. Данные доступны в текущем сеансе.",noExport:"Не удалось создать файл в этом браузере.",more:"Показать все дни",less:"Последние 14 дней",cohort:"Первое появление",size:"Кошельки",asOf:"Данные на",notLive:"На момент успешной синхронизации",rolling:"Последние 24 часа",calendar7:"7 календарных дней UTC",calendar30:"30 календарных дней UTC",dateRange:"Выбранные даты UTC",noFee:"Нет платежей комиссий",weekOf:"Неделя с",scanned:"Проверено транзакций",provider:"Источник данных",coverage:"Полнота истории",verified:"Непрерывная история адреса",collector:"Комиссионный кошелёк",exportTitle:"Pepegun Analytics",exportNote:"Кошельки — адреса, а не люди. Независимая ончейн-аналитика.",
 methodItems:[
 "Данные одного публичного комиссионного кошелька в TON получаются через Toncenter API v3 или TonAPI v2. Полная выгрузка должна образовывать непрерывную цепочку до первой транзакции адреса.",
-"Учитываются успешные входящие положительные переводы нативной валюты с текстовым комментарием Pepegun. Возвращённые переводы и переводы самому себе исключаются. Повторы хешей и полных нормализованных адресов не учитываются. Комментарий сам по себе не подтверждает сделку.",
-"Только комментарии Pepegun fee относятся к платежам комиссий и валовому комиссионному доходу. Другие переводы Pepegun, в том числе крупные, учитываются в активности, но не в доходе. Платежи не равны числу сделок, а валовые комиссии — чистой прибыли.",
+"Учитываются успешные входящие положительные переводы нативной валюты с распознанным префиксом комментария Pepegun. Возвращённые переводы и переводы самому себе исключаются. Повторы хешей и полных нормализованных адресов не учитываются. Комментарий сам по себе не подтверждает сделку.",
+"Только комментарии с префиксом Pepegun fee относятся к платежам комиссий и валовому комиссионному доходу. Другие переводы Pepegun, в том числе крупные, учитываются в активности, но не в доходе. Платежи не равны числу сделок, а валовые комиссии — чистой прибыли.",
 "Новые кошельки впервые появились в выбранном периоде. Вернувшиеся были замечены ранее и активны в нём. Накопительные итоги — уникальные адреса с начала наблюдения. Активность за 1, 7 и 30 дней рассчитана по календарным дням UTC до конца выбранного периода; эти окна могут начинаться раньше периода.",
-"Все календарные даты — UTC. Фильтры 7 и 30 дней включают день последнего снимка и 6 или 29 предыдущих дней; 6 и 24 часа — скользящие интервалы. Незавершённые интервалы отмечены. Сохранённые данные считаются только до последней успешной синхронизации.",
+"Все календарные даты — UTC. Фильтры 7 и 30 дней включают день последнего снимка и 6 или 29 предыдущих дней; 6 и 24 часа — скользящие интервалы. Графики используют адаптивные интервалы UTC; неполные интервалы отмечены. Сохранённые данные считаются только до последней успешной синхронизации.",
 "Обновление при открытии, вручную, каждые 15 минут на открытой странице и при возврате в давно открытую вкладку. Браузер хранит последнюю проверенную историю; фонового сервера и платного API нет. Доступность зависит от публичных индексаторов блокчейна."]}
 };
-const extraWords={"en":{"median":"Median fee","perPayer":"Fees per paying wallet","top5":"Top 5 share of fees","top10":"Top 10 share of fees","newPayers":"New paying wallets","repeatPayers":"Returning paying wallets","comparison":"Previous comparable period","compareHint":"Equal elapsed UTC time in the previous window. All-time has no previous window.","metric":"Metric","current":"Current","previous":"Previous","delta":"Change","noComparison":"No comparable earlier period","audit":"Source cross-check","auditButton":"Compare both indexers","auditIdle":"Not independently checked for this snapshot","auditBusy":"Checking alternate indexer…","auditMatch":"Both sources match","auditMismatch":"Sources disagree — review required","auditUnavailable":"Alternate indexer could not verify this snapshot","ambiguous":"Unclassified Pepegun comments (all time)","chainTip":"Account transaction time","shortRules":"Only the exact Pepegun or Pepegun fee prefix (optionally 🔫), followed by a middle-dot label or end of text, is accepted. Other mentions are excluded and counted separately. Source agreement validates the indexers, not trade identity.","topHint":"Share of fees paid by the highest-paying addresses in the selected period.","h6":"6h","rolling6":"Rolling 6 hours","daily":"Wallet activity","dailyHint":"Distinct addresses per interval","feesChart":"Fee revenue","feesHint":"Incoming fees · GRAM","history":"Interval history","historyHint":"Values use the same intervals as the charts.","retention":"Wallet return rate","retentionHint":"Wallets first seen in the selected period that returned on another UTC day within 7, 14 or 30 days. Only completed follow-up windows count.","interval":"Interval (UTC)","granularity":"Interval","g15m":"15 min","g1h":"1 hour","g3h":"3 hours","g6h":"6 hours","gday":"1 day","gweek":"1 week","gmonth":"1 month","txTitle":"Transactions","txHint":"Incoming transfers included in the statistics. Open any transaction in Tonviewer.","txAll":"All transfers","txFees":"Fees","txOther":"Other","txSelected":"Selected interval","txReset":"Entire period","txOpen":"View transactions","txLink":"View ↗","txShow":"Show more","txEmpty":"No transfers in this interval","txCount":"Transfers","returnWithin":"Within","noEligible":"Not enough elapsed time","more":"Show all intervals","less":"Show latest 14 intervals"},"ru":{"median":"Медианная комиссия","perPayer":"Комиссии на платящий кошелёк","top5":"Доля комиссий топ-5","top10":"Доля комиссий топ-10","newPayers":"Новые платящие кошельки","repeatPayers":"Повторные платящие","comparison":"Сравнение с предыдущим периодом","compareHint":"Равный по длительности предыдущий интервал UTC. Для всего времени сравнения нет.","metric":"Показатель","current":"Сейчас","previous":"Ранее","delta":"Изменение","noComparison":"Нет сопоставимого предыдущего периода","audit":"Сверка источников","auditButton":"Сверить оба индексатора","auditIdle":"Этот снимок ещё не сверялся","auditBusy":"Проверка второго индексатора…","auditMatch":"Оба источника совпадают","auditMismatch":"Источники расходятся — нужна проверка","auditUnavailable":"Второй индексатор не подтвердил снимок","ambiguous":"Нетипичные комментарии Pepegun (за всё время)","chainTip":"Время последней транзакции адреса","shortRules":"Принимается точный префикс Pepegun или Pepegun fee (необязательно 🔫), за которым следует метка через · или конец строки. Другие упоминания исключаются и учитываются отдельно. Совпадение источников проверяет индексаторы, а не подлинность сделок.","topHint":"Доля комиссионного дохода от адресов с наибольшей суммой комиссий за выбранный период.","h6":"6 ч.","rolling6":"Последние 6 часов","daily":"Активность кошельков","dailyHint":"Уникальные адреса за интервал","feesChart":"Комиссионный доход","feesHint":"Входящие комиссии · GRAM","history":"История по интервалам","historyHint":"Интервалы совпадают с графиками.","retention":"Возвращаемость кошельков","retentionHint":"Доля впервые замеченных в выбранном периоде кошельков, которые вернулись в другой день UTC в течение 7, 14 или 30 дней. Учитываются только полностью прошедшие сроки наблюдения.","interval":"Интервал (UTC)","granularity":"Интервал","g15m":"15 мин.","g1h":"1 час","g3h":"3 часа","g6h":"6 часов","gday":"1 день","gweek":"1 неделя","gmonth":"1 месяц","txTitle":"Транзакции","txHint":"Входящие переводы, учтённые в статистике. Каждую транзакцию можно открыть в Tonviewer.","txAll":"Все переводы","txFees":"Комиссии","txOther":"Другие","txSelected":"Выбранный интервал","txReset":"Весь период","txOpen":"Транзакции интервала","txLink":"Открыть ↗","txShow":"Показать ещё","txEmpty":"Нет переводов за этот интервал","txCount":"Переводы","returnWithin":"В течение","noEligible":"Недостаточно времени наблюдения","more":"Все интервалы","less":"Последние 14 интервалов"}};Object.assign(words.en,extraWords.en);Object.assign(words.ru,extraWords.ru);
+const extraWords={"en":{"median":"Median fee","perPayer":"Fees per paying wallet","top5":"Top 5 share of fees","top10":"Top 10 share of fees","newPayers":"New paying wallets","repeatPayers":"Returning paying wallets","comparison":"Previous comparable period","compareHint":"Same elapsed UTC time in previous window; no comparison before observed history.","metric":"Metric","current":"Current","previous":"Previous","delta":"Change","noComparison":"No comparable earlier period","audit":"Source cross-check","auditButton":"Compare both indexers","auditIdle":"Not independently checked for this snapshot","auditBusy":"Checking alternate indexer…","auditMatch":"Both sources match","auditMismatch":"Sources disagree — review required","auditUnavailable":"Alternate indexer could not verify this snapshot","ambiguous":"Unclassified Pepegun comments (all time)","chainTip":"Account transaction time","shortRules":"Only the exact Pepegun or Pepegun fee prefix (optionally 🔫), followed by a middle-dot label or end of text, is accepted. Other mentions are excluded and counted separately. Source agreement validates the indexers, not trade identity.","topHint":"Share of labelled fee revenue from the highest-paying addresses in the selected period.","h6":"6h","rolling6":"Rolling 6 hours","daily":"Wallet activity","dailyHint":"Distinct addresses per interval","feesChart":"Fee revenue","feesHint":"Gross incoming fees · GRAM","retention":"Wallet return rates","retentionHint":"New wallets in the selected period active again on a later UTC day within 7, 14 or 30 days. Only fully observed follow-up windows count.","history":"Interval history","historyHint":"Same intervals as charts. Cumulative counts include earlier history.","more":"Show more","less":"Show fewer","transactionsTitle":"Transactions","transactionsHint":"Incoming Pepegun transfers in the selected period, with links to Tonviewer.","filterAll":"All","filterFee":"Fees","filterOther":"Other","viewTx":"View transactions","viewInterval":"Selected interval","resetInterval":"Whole period","txEmpty":"No matching transfers","txTypeFee":"Fee","txTypeOther":"Other transfer","interval":"Interval","interval15":"15 min","interval1":"1 hour","interval3":"3 hours","interval6":"6 hours","intervalDay":"1 day","intervalWeek":"1 week","intervalMonth":"1 month","returnedWithin":"Within","noEligible":"Not enough history","auditPrior":"Earlier snapshot","calendarWindows":"UTC calendar windows","txShown":"Shown","of":"of","newPayShort":"New payers","txLink":"Tonviewer"},"ru":{"median":"Медианная комиссия","perPayer":"Комиссии на платящий кошелёк","top5":"Доля комиссий топ-5","top10":"Доля комиссий топ-10","newPayers":"Новые платящие кошельки","repeatPayers":"Повторные платящие","comparison":"Сравнение с предыдущим периодом","compareHint":"Сопоставимый интервал UTC; сравнение до начала наблюдений не проводится.","metric":"Показатель","current":"Сейчас","previous":"Ранее","delta":"Изменение","noComparison":"Нет сопоставимого предыдущего периода","audit":"Сверка источников","auditButton":"Сверить оба индексатора","auditIdle":"Этот снимок ещё не сверялся","auditBusy":"Проверка второго индексатора…","auditMatch":"Оба источника совпадают","auditMismatch":"Источники расходятся — нужна проверка","auditUnavailable":"Второй индексатор не подтвердил снимок","ambiguous":"Нетипичные комментарии Pepegun (за всё время)","chainTip":"Время последней транзакции адреса","shortRules":"Принимается точный префикс Pepegun или Pepegun fee (необязательно 🔫), за которым следует метка через · или конец строки. Другие упоминания исключаются и учитываются отдельно. Совпадение источников проверяет индексаторы, а не подлинность сделок.","topHint":"Доля комиссионного дохода от адресов с наибольшей суммой комиссий за выбранный период.","h6":"6 ч.","rolling6":"Последние 6 часов","daily":"Активность кошельков","dailyHint":"Уникальные адреса за интервал","feesChart":"Комиссии","feesHint":"Входящие комиссии · GRAM","retention":"Возвращаемость кошельков","retentionHint":"Новые кошельки за период, активные снова в один из следующих дней UTC в течение 7, 14 или 30 дней. Только полностью наблюдаемые интервалы.","history":"История по интервалам","historyHint":"Интервалы совпадают с графиками. Накопительные показатели учитывают более раннюю историю.","more":"Показать ещё","less":"Свернуть","transactionsTitle":"Транзакции","transactionsHint":"Входящие переводы Pepegun за выбранный период со ссылками на Tonviewer.","filterAll":"Все","filterFee":"Комиссии","filterOther":"Другие","viewTx":"Смотреть транзакции","viewInterval":"Выбранный интервал","resetInterval":"Весь период","txEmpty":"Нет подходящих переводов","txTypeFee":"Комиссия","txTypeOther":"Другой перевод","interval":"Интервал","interval15":"15 мин","interval1":"1 час","interval3":"3 часа","interval6":"6 часов","intervalDay":"1 день","intervalWeek":"1 неделя","intervalMonth":"1 месяц","returnedWithin":"За","noEligible":"Недостаточно истории","auditPrior":"Более ранний снимок","calendarWindows":"Календарные дни UTC","txShown":"Показано","of":"из","newPayShort":"Новые платящие","txLink":"Tonviewer"}};Object.assign(words.en,extraWords.en);Object.assign(words.ru,extraWords.ru);
 const $=id=>document.getElementById(id);
 let lang="en";try{lang=localStorage.getItem("pepegun-lang")||(/^ru\b/i.test(navigator.language)?"ru":"en")}catch{}if(!words[lang])lang="en";
 const tr=k=>words[lang][k]||k,locale=()=>lang==="ru"?"ru-RU":"en-US",num=x=>new Intl.NumberFormat(locale()).format(x),fmt=(x,d=2)=>amount(x,d,locale()),pct=(a,b)=>b?new Intl.NumberFormat(locale(),{style:"percent",maximumFractionDigits:1}).format(a/b):"—";
@@ -38,10 +36,16 @@ const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const time=t=>new Date(t).toISOString().slice(0,16).replace("T"," ")+" UTC";
 const utcDate=(t,year=false)=>new Intl.DateTimeFormat(locale(),{timeZone:"UTC",day:"numeric",month:"short",...(year?{year:"numeric"}:{})}).format(new Date(t));
 const syncTime=t=>utcDate(t)+", "+new Date(t).toISOString().slice(11,16)+" UTC";
-const shortDate=s=>{const d=s.split("-");return lang==="ru"?d[2]+"."+d[1]:d[1]+"/"+d[2]};
+const shortDate=s=>{const d=s.slice(0,10).split("-");return lang==="ru"?d[2]+"."+d[1]:d[1]+"/"+d[2]};
+const clock=t=>new Date(t).toISOString().slice(11,16);
+const intervalName=k=>tr(({"15m":"interval15","1h":"interval1","3h":"interval3","6h":"interval6",day:"intervalDay",week:"intervalWeek",month:"intervalMonth"})[k]);
+const hourly=()=>["15m","1h","3h","6h"].includes(series.kind);
+function axisLabel(b){return hourly()?(series.kind==="15m"||series.kind==="1h"?clock(b.bucket):shortDate(b.date)+" "+clock(b.bucket)):series.kind==="month"?b.date.slice(0,7):shortDate(b.date)}
+function intervalLabel(b){const a=b.start,z=b.end-1;if(hourly())return utcDate(a)+" "+clock(a)+" — "+(dayIndex(a)===dayIndex(b.end)?"":utcDate(b.end)+" ")+clock(b.end);return dayIndex(a)===dayIndex(z)?utcDate(a,true):utcDate(a)+" — "+utcDate(z,true)}
+function exportDateLabel(){return range?(selected==="6h"||selected==="24h"?time(range.from)+" — "+time(range.to-1):dateLabel()+" · UTC"):""}
 const statusLabel=s=>s==="partial"?tr("partial"):s==="incomplete"?tr("incomplete"):tr("complete");
-let cache=null,selected="all",m=null,range=null,busy=true,error=false,storageError=false,exportError=false,progress=null,showAll=false,resizeTimer;
-let pointsState={},audit=null,auditing=false,series=null,txRange=null,txType="all",txLimit=20;
+let cache=null,selected="all",m=null,range=null,busy=true,error=false,storageError=false,exportError=false,progress=null,resizeTimer;
+let pointsState={},audit=null,auditing=false,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
 function stale(){return !!cache&&(error||Date.now()-cache.asOf>STALE)}
 function language(){document.documentElement.lang=lang;document.querySelectorAll("[data-i]").forEach(el=>el.textContent=tr(el.dataset.i));const switchLabel=lang==="ru"?"Switch to English":"Переключить на русский";$("language").textContent=lang==="ru"?"EN":"RU";$("language").setAttribute("aria-label",switchLabel);$("language").title=switchLabel;$("refresh").setAttribute("aria-label",tr("refresh"));$("refresh").title=tr("refresh");$("filters").setAttribute("aria-label",tr("range"));$("overview").setAttribute("aria-label",tr("overview"));$("active").setAttribute("aria-label",tr("active"));}
 function updateStatus(){
@@ -64,13 +68,15 @@ function setDates(){
  for(const id of ["from","to"]){const el=$(id);el.min=start;el.max=end;if(!el.value)el.value=id==="from"?start:end;}
 }
 function dateLabel(){if(!range||!cache)return "";const a=range.from,b=range.to-1;const label=selected==="all"?tr("all"):selected==="6h"?tr("rolling6"):selected==="24h"?tr("rolling"):selected==="7d"?tr("calendar7"):selected==="30d"?tr("calendar30"):tr("dateRange");return label+" · "+dayKey(dayIndex(a))+" — "+dayKey(dayIndex(b));}
-function rangeNote(){if(!cache)return "";if(!range)return tr("badRange");const a=range.from,b=range.to-1;const sameYear=new Date(a).getUTCFullYear()===new Date(b).getUTCFullYear();const dates=(selected==="24h"||selected==="6h")?utcDate(a)+" "+new Date(a).toISOString().slice(11,16)+" — "+utcDate(b,true)+" "+new Date(b).toISOString().slice(11,16):dayKey(dayIndex(a))===dayKey(dayIndex(b))?utcDate(b,true):utcDate(a,!sameYear)+" — "+utcDate(b,true);return dates+" · UTC";}
+function rangeNote(){if(!cache)return "";if(!range)return tr("badRange");const a=range.from,b=range.to-1;const sameYear=new Date(a).getUTCFullYear()===new Date(b).getUTCFullYear();const dates=(selected==="6h"||selected==="24h")?utcDate(a)+" "+new Date(a).toISOString().slice(11,16)+" — "+utcDate(b,true)+" "+new Date(b).toISOString().slice(11,16):dayKey(dayIndex(a))===dayKey(dayIndex(b))?utcDate(b,true):utcDate(a,!sameYear)+" — "+utcDate(b,true);return dates+" · UTC";}
 function render(){
  language();setDates();
  range=cache?resolveRange(selected,cache.asOf,cache.rows[0]?.t*1000||cache.asOf,{from:$("from").value,to:$("to").value}):null;
  m=cache&&range?metrics(cache.rows,range,cache.asOf):null;
- series=m?adaptiveSeries(cache.rows,range,cache.asOf):null;
- $("range-note").textContent=rangeNote(); $("interval-note").textContent=series?tr("granularity")+": "+tr("g"+series.kind)+" · UTC":"";
+ series=m?adaptiveSeries(cache.rows,range,cache.asOf):{kind:"day",bins:[]};
+ if(txRange&&range){txRange={from:Math.max(txRange.from,range.from),to:Math.min(txRange.to,range.to)};if(txRange.to<=txRange.from)txRange=null}
+ for(const id of ["growth-interval","activity-interval","fee-interval"])$(id).textContent=m?intervalName(series.kind)+" · UTC":"";
+ $("range-note").textContent=rangeNote();
  $("custom").hidden=selected!=="custom";
  document.querySelectorAll("[data-range]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.range===selected));
  $("csv").disabled=$("png").disabled=!m;
@@ -80,34 +86,32 @@ function render(){
  kpi(tr("revenue"),m?fmt(m.fee):"—","",false,"GRAM"),
  kpi(tr("payments"),m?num(m.count):"—",m&&m.count?tr("avg")+": "+fmt(m.fee/BigInt(m.count),4)+" GRAM":"")
  ].join("");
- $("active").innerHTML='<div class="activity-title"><strong>'+esc(tr("active"))+'</strong><small>'+esc(tr("windowEnd")+(m?" "+utcDate(Date.parse(m.anchor+"T00:00:00Z"),true)+" · UTC":""))+'</small></div>'+[["today","dau"],["week","wau"],["month","mau"]].map(([k,v])=>'<div class="active-stat"><strong>'+esc(m?num(m.activity[v]):"—")+'</strong><small>'+esc(tr(k))+'</small></div>').join("");
+ $("active").innerHTML='<div class="activity-title"><strong>'+esc(tr("active"))+'</strong><small>'+esc(tr("calendarWindows")+(m?" · "+utcDate(Date.parse(m.anchor+"T00:00:00Z"),true):""))+'</small></div>'+[["today","dau"],["week","wau"],["month","mau"]].map(([k,v])=>'<div class="active-stat"><strong>'+esc(m?num(m.activity[v]):"—")+'</strong><small>'+esc(tr(k))+'</small></div>').join("");
  $("finite").hidden=selected==="all"||!m;$("finite").innerHTML=m?kpi(tr("new"),num(m.newWallets),tr("firstSeen"))+kpi(tr("returning"),num(m.returning),tr("seenBefore")):"";
- renderCharts();renderDetails();updateStatus();
+ renderCharts();renderDetails();renderTransactions();updateStatus();
 }
 const colors={all:"#b5ef58",paid:"#71c5b3",new:"#a8d956",returning:"#414f48",fee:"#a8d956",grid:"#292e2b",text:"#919c95"};
-const fnum=x=>new Intl.NumberFormat(locale(),{maximumFractionDigits:2,notation:x>=100000?"compact":"standard"}).format(x);
-function chartSpec(){const b=series?.bins;return [
- ["growth-chart",b,[{key:"cum",label:tr("allShort"),color:colors.all},{key:"cumPay",label:tr("payingShort"),color:colors.paid}],"line",false],
- ["daily-chart",b,[{key:"new",label:tr("newShort"),color:colors.new},{key:"returning",label:tr("returningShort"),color:colors.returning},{key:"paying",label:tr("payingShort"),color:colors.paid,line:true}],"stack",false],
- ["fees-chart",b,[{key:"fee",label:tr("fee"),color:colors.fee}],"bar",true]
+const fnum=(x,step=1)=>new Intl.NumberFormat(locale(),{maximumFractionDigits:Math.max(0,Math.min(9,Math.ceil(-Math.log10(step))+1)),notation:x>=100000?"compact":"standard"}).format(x);
+function chartSpec(){return [
+ ["growth-chart",series.bins,[{key:"cum",label:tr("allShort"),color:colors.all},{key:"cumPay",label:tr("payingShort"),color:colors.paid}],"line",false],
+ ["daily-chart",series.bins,[{key:"new",label:tr("newShort"),color:colors.new},{key:"returning",label:tr("returningShort"),color:colors.returning},{key:"paying",label:tr("payingShort"),color:colors.paid,line:true}],"stack",false],
+ ["fees-chart",series.bins,[{key:"fee",label:tr("fee"),color:colors.fee}],"bar",true]
 ];}
-function binTick(b){const iso=new Date(b.bucket).toISOString();return ["15m","1h","3h","6h"].includes(series?.kind)?iso.slice(11,16):series?.kind==="month"?iso.slice(0,7):shortDate(iso.slice(0,10))}
-function binLabel(b){const a=new Date(b.start).toISOString(),z=new Date(b.end-1).toISOString();return ["15m","1h","3h","6h"].includes(series?.kind)?a.slice(0,10)+" "+a.slice(11,16)+" – "+(a.slice(0,10)!==z.slice(0,10)?z.slice(0,10)+" ":"")+z.slice(11,16):a.slice(0,10)+(a.slice(0,10)!==z.slice(0,10)?" – "+z.slice(0,10):"")}
 function renderCharts(){for(const [id,data,series,kind,decimal] of chartSpec())drawChart(id,data,series,kind,decimal)}
 function drawChart(id,data,series,kind,decimal){
  const root=$(id);if(!data?.length){root.innerHTML=placeholder();return}
- const W=Math.max(220,Math.round(root.clientWidth||320)),H=W<480?184:218,L=W<330?32:39,R=12,T=12,B=27,plotW=W-L-R,plotH=H-T-B;
+ const W=Math.max(220,Math.round(root.clientWidth||320)),H=W<480?184:218,L=W<330?40:46,R=12,T=12,B=27,plotW=W-L-R,plotH=H-T-B;
  const val=(r,s)=>s.key==="fee"?Number(r.fee)/1e9:Number(r[s.key]||0);
  let max=0;for(const row of data){const a=kind==="stack"?[series.filter(s=>!s.line).reduce((n,s)=>n+val(row,s),0),...series.filter(s=>s.line).map(s=>val(row,s))]:series.map(s=>val(row,s));max=Math.max(max,...a)}
  const unit=max===0?1:Math.pow(10,Math.floor(Math.log10(max/3||1))),raw=max/3/unit,step=max===0?1:Math.max(decimal?0.000001:1,(raw<=1?1:raw<=2?2:raw<=2.5?2.5:raw<=5?5:10)*unit);
  const ceil=Math.max(step,Math.ceil(max/step)*step),ticks=Math.round(ceil/step);
  const cell=plotW/data.length,x=i=>L+(i+.5)*cell,y=v=>T+plotH-Math.min(1,v/ceil)*plotH;
- let svg='<svg class="chart-plot" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" tabindex="0" role="img" aria-label="'+esc(tr({"growth-chart":"growth","daily-chart":"daily","fees-chart":"feesChart","weekly-chart":"weekly","payer-chart":"payerTrend"}[id]))+'">';
+ let svg='<svg class="chart-plot" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" tabindex="0" role="img" aria-label="'+esc(tr({"growth-chart":"growth","daily-chart":"daily","fees-chart":"feesChart"}[id]))+'">';
  svg+='<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="transparent" pointer-events="all"/>';
- for(let i=0;i<=ticks;i++){const v=i*step,py=y(v);svg+='<path d="M'+L+' '+py+'H'+(W-R)+'" stroke="'+colors.grid+'" stroke-width="1"/><text x="'+(L-5)+'" y="'+(py+4)+'" fill="'+colors.text+'" text-anchor="end" font-size="10">'+esc(fnum(v))+'</text>'}
- const tickCount=W<340?4:W<550?5:7,stepX=Math.max(1,Math.ceil((data.length-1)/(tickCount-1)));
+ for(let i=0;i<=ticks;i++){const v=i*step,py=y(v);svg+='<path d="M'+L+' '+py+'H'+(W-R)+'" stroke="'+colors.grid+'" stroke-width="1"/><text x="'+(L-5)+'" y="'+(py+4)+'" fill="'+colors.text+'" text-anchor="end" font-size="10">'+esc(fnum(v,step))+'</text>'}
+ const tickCount=hourly()?(W<480?3:5):W<340?4:W<550?5:7,stepX=Math.max(1,Math.ceil((data.length-1)/(tickCount-1)));
  let idxs=[];for(let i=0;i<data.length;i+=stepX)idxs.push(i);if(idxs.at(-1)!==data.length-1){if(data.length-1-idxs.at(-1)<stepX*.55&&idxs.length>1)idxs.pop();idxs.push(data.length-1)}
- for(const i of idxs){const px=Math.min(W-R-10,Math.max(L+4,x(i)));svg+='<text x="'+px+'" y="'+(H-7)+'" text-anchor="middle" font-size="10" fill="'+colors.text+'">'+esc(binTick(data[i]))+'</text>'}
+ for(const i of idxs){const edge=hourly()&&series.kind!=="15m"&&series.kind!=="1h"?28:15;const px=Math.min(W-R-edge,Math.max(L+edge,x(i)));svg+='<text x="'+px+'" y="'+(H-7)+'" text-anchor="middle" font-size="10" fill="'+colors.text+'">'+esc(axisLabel(data[i]))+'</text>'}
  const isPartial=r=>r.status!=="complete";
  if(kind==="bar"||kind==="stack"){
   data.forEach((r,i)=>{let prev=0;const bw=Math.max(.6,Math.min(cell*.7,24));for(const s of series.filter(z=>!z.line)){const v=val(r,s);if(v>0){const top=y(prev+v),h=y(prev)-top;svg+='<rect x="'+(x(i)-bw/2)+'" y="'+top+'" width="'+bw+'" height="'+h+'" rx="'+Math.min(2,bw/4)+'" fill="'+s.color+'" opacity="'+(isPartial(r)?.48:1)+'"/>'}prev+=v}});
@@ -121,11 +125,11 @@ function drawChart(id,data,series,kind,decimal){
   }
  }
  svg+='<line class="cursor" x1="0" x2="0" y1="'+T+'" y2="'+(T+plotH)+'" stroke="#adb9ae" stroke-dasharray="3 3" opacity=".5"/></svg>';
- root.innerHTML=svg+'<div class="chart-legend">'+series.map(s=>'<span><i class="swatch" style="background:'+s.color+'"></i>'+esc(s.label)+'</span>').join("")+'</div><div class="chart-readout" aria-live="polite"></div><button type="button" class="chart-tx outline">↗ '+esc(tr("txOpen"))+'</button>';
+ root.innerHTML=svg+'<div class="chart-legend">'+series.map(s=>'<span><i class="swatch" style="background:'+s.color+'"></i>'+esc(s.label)+'</span>').join("")+'</div><div class="chart-readout" aria-live="polite"></div><button type="button" class="chart-tx">'+esc(tr("viewTx"))+' ↗</button>';
  const graphic=root.querySelector("svg"),cursor=root.querySelector(".cursor"),readout=root.querySelector(".chart-readout");
- function focus(i){i=Math.max(0,Math.min(data.length-1,i));pointsState[id]=i;const r=data[i];cursor.setAttribute("x1",x(i));cursor.setAttribute("x2",x(i));readout.innerHTML='<strong>'+esc(binLabel(r))+'</strong>'+(isPartial(r)?" · "+esc(statusLabel(r.status)):"")+" · "+series.map(s=>esc(s.label)+": <strong>"+esc(s.key==="fee"?fmt(r.fee,3)+" GRAM":num(val(r,s)))+"</strong>").join(" · ")}
+ function focus(i){i=Math.max(0,Math.min(data.length-1,i));pointsState[id]=i;const r=data[i];cursor.setAttribute("x1",x(i));cursor.setAttribute("x2",x(i));readout.innerHTML='<strong>'+esc(intervalLabel(r))+'</strong>'+(isPartial(r)?" · "+esc(statusLabel(r.status)):"")+" · "+series.map(s=>esc(s.label)+": <strong>"+esc(s.key==="fee"?fmt(r.fee,6)+" GRAM":num(val(r,s)))+"</strong>").join(" · ")}
  focus(Math.min(pointsState[id]??data.length-1,data.length-1));
- root.querySelector(".chart-tx").addEventListener("click",()=>{const b=data[pointsState[id]??data.length-1];txRange={from:b.start,to:b.end};txType=id==="fees-chart"?"fee":"all";txLimit=20;renderTransactions();$("tx-section").open=true;$("tx-section").scrollIntoView({block:"start",behavior:"smooth"})});
+ root.querySelector(".chart-tx").addEventListener("click",()=>{const r=data[pointsState[id]??data.length-1];if(r)openTransactions({from:r.start,to:r.end},id==="fees-chart"?"fee":"all")});
  let activePointer=null;
  function pointer(e){const rect=graphic.getBoundingClientRect();if(!rect.width)return;const px=(e.clientX-rect.left)*W/rect.width;const i=Math.max(0,Math.min(data.length-1,Math.floor((px-L)/cell)));if(pointsState[id]!==i)focus(i)}
  graphic.addEventListener("pointerdown",e=>{
@@ -150,57 +154,52 @@ function drawChart(id,data,series,kind,decimal){
 function table(headers,rows){return '<div class="table-wrap" tabindex="0"><table><thead><tr>'+headers.map(h=>'<th scope="col">'+esc(h)+'</th>').join("")+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(v=>'<td>'+v+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>'}
 function venueLabel(s){return s==="Unlabelled"?(lang==="ru"?"Без метки":"Unlabelled"):s}
 function renderDetails(){
- if(!m){for(const id of ["venues","advanced","retention","history","comparison"])$(id).innerHTML=placeholder();$("more").hidden=true;$("insights").hidden=true}
+ $("insights").hidden=!m;
+ if(!m){for(const id of ["venues","advanced","retention","history","comparison"])$(id).innerHTML=placeholder();$("more").hidden=true}
  else{
- $("venues").innerHTML=m.venues.length?'<div class="venue-list">'+m.venues.map(v=>'<div class="venue-row"><div class="venue-name">'+esc(venueLabel(v.label))+'</div><div class="venue-value">'+esc(fmt(v.fee,3))+' GRAM</div><div class="venue-bar"><b style="width:'+(m.fee>0n?Number(v.fee*10000n/m.fee)/100:0)+'%"></b></div><div class="venue-meta">'+esc(num(v.wallets)+" "+tr("wallets").toLowerCase()+" · "+num(v.count)+" "+tr("payments").toLowerCase())+'</div></div>').join("")+'</div>':placeholder();
-
+ $("venues").innerHTML=m.venues.length?'<div class="venue-list">'+m.venues.map(v=>'<div class="venue-row"><div class="venue-name">'+esc(venueLabel(v.label))+'</div><div class="venue-value">'+esc(fmt(v.fee,4))+' GRAM</div><div class="venue-bar"><b style="width:'+(m.fee>0n?Number(v.fee*10000n/m.fee)/100:0)+'%"></b></div><div class="venue-meta">'+esc((lang==="ru"?"Кошельки: ":"Wallets: ")+num(v.wallets)+" · "+(lang==="ru"?"Платежи: ":"Payments: ")+num(v.count))+'</div></div>').join("")+'</div>':placeholder();
  const x=extraMetrics(cache.rows,range,cache.asOf);
- const detail=[[tr("median"),x.median2===null?"—":fmt((x.median2+1n)/2n,4)+" GRAM"],[tr("perPayer"),x.perPayer===null?"—":fmt(x.perPayer,4)+" GRAM"],[tr("top5"),pct(Number(x.top5),Number(x.total))],[tr("top10"),pct(Number(x.top10),Number(x.total))],[tr("newPayers"),num(x.newPayers)],[tr("repeatPayers"),num(x.repeatPayers)]];
- $("insights").hidden=false;
+ const detail=[[tr("median"),x.median2===null?"—":fmt((x.median2+1n)/2n,6)+" GRAM"],[tr("perPayer"),x.perPayer===null?"—":fmt(x.perPayer,6)+" GRAM"],[tr("top5"),pct(Number(x.top5),Number(x.total))],[tr("top10"),pct(Number(x.top10),Number(x.total))],[tr("newPayers"),num(x.newPayers)],[tr("repeatPayers"),num(x.repeatPayers)],[tr("largest"),m.count?fmt(m.largest,6)+" GRAM":"—"],[tr("other"),num(m.other)],[tr("exactFee"),exact(m.fee)+" GRAM"]];
  $("advanced").innerHTML='<div class="advanced-grid">'+detail.map(([k,v])=>'<div><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div>';
  const prev=previousRange(range,cache.rows[0]?.t*1000||cache.asOf),p=prev?metrics(cache.rows,prev,cache.asOf):null;
  const cf=v=>v===null?"—":new Intl.NumberFormat(locale(),{style:"percent",maximumFractionDigits:1,signDisplay:"always"}).format(v);
  const cp=(label,a,b,format)=>[esc(label),esc(format(a)),esc(format(b)),esc(cf(change(a,b)))];
- $("comparison").innerHTML=p?'<p class="sub">'+esc(time(prev.from)+" — "+time(prev.to-1))+'</p>'+table([tr("metric"),tr("current"),tr("previous"),tr("delta")],[cp(tr("wallets"),m.wallets,p.wallets,num),cp(tr("paying"),m.paying,p.paying,num),cp(tr("revenue")+" (GRAM)",m.fee,p.fee,v=>fmt(v)),cp(tr("payments"),m.count,p.count,num)]):'<p class="sub">'+esc(tr("noComparison"))+'</p>';
- const rates=returnRates(cache.rows,range,cache.asOf);
- $("retention").innerHTML='<div class="advanced-grid retention-grid">'+rates.map(v=>'<div><span>'+esc(tr("returnWithin")+" "+v.days+(lang==="ru"?" дн.":" days"))+'</span><strong>'+esc(v.eligible?pct(v.returned,v.eligible):"—")+'</strong><span>'+esc(v.eligible?num(v.returned)+" / "+num(v.eligible):tr("noEligible"))+'</span></div>').join("")+'</div>';
- const rows=[...series.bins].reverse();$("history").innerHTML=rows.length?table([tr("interval"),tr("activeShort"),tr("newShort"),tr("payingShort"),tr("count"),tr("fee")+" (GRAM)"],(showAll?rows:rows.slice(0,14)).map(d=>[esc(binLabel(d))+(d.status==="complete"?"":'<div class="date-status">'+esc(statusLabel(d.status))+'</div>'),...([d.active,d.new,d.paying,d.count].map(x=>esc(num(x)))),esc(fmt(d.fee,4))])):placeholder();
- $("more").hidden=rows.length<=14;$("more").textContent=tr(showAll?"less":"more");
+ $("comparison").innerHTML=p?'<p class="sub">'+esc(time(prev.from)+" — "+time(prev.to-1))+'</p>'+table([tr("metric"),tr("current"),tr("previous"),tr("delta")],[cp(tr("wallets"),m.wallets,p.wallets,num),cp(tr("paying"),m.paying,p.paying,num),cp(tr("revenue"),m.fee,p.fee,v=>fmt(v,4)),cp(tr("payments"),m.count,p.count,num)]):placeholder(tr("noComparison"));
+ $("retention").innerHTML='<div class="return-grid">'+returnRates(cache.rows,range,cache.asOf).map(r=>'<div><span>'+esc(tr("returnedWithin")+" "+r.days+(lang==="ru"?" дн.":" days"))+'</span><strong>'+esc(pct(r.returned,r.eligible))+'</strong><small>'+esc(r.eligible?num(r.returned)+" / "+num(r.eligible):tr("noEligible"))+'</small></div>').join("")+'</div>';
+ const rows=[...series.bins].reverse();$("history").innerHTML=rows.length?table([tr("interval"),tr("activeShort"),tr("newShort"),tr("returningShort"),tr("payingShort"),tr("newPayShort"),tr("count"),tr("fee")+" (GRAM)",tr("cum"),tr("cumPay")],rows.slice(0,historyLimit).map(d=>[esc(intervalLabel(d))+(d.status==="complete"?"":'<div class="date-status">'+esc(statusLabel(d.status))+'</div>'),...[d.active,d.new,d.returning,d.paying,d.newPay,d.count].map(x=>esc(num(x))),esc(exact(d.fee)),esc(num(d.cum)),esc(num(d.cumPay))])):placeholder();
+ $("more").hidden=rows.length<=14;$("more").textContent=tr(historyLimit>=rows.length?"less":"more");
  }
- renderTransactions();renderExtras();
- const items=[...tr("methodItems"),tr("shortRules")];$("method").innerHTML='<ul class="method-list">'+items.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><div class="method-facts">'+esc(tr("collector"))+': <a href="https://tonviewer.com/'+ADDRESS+'" target="_blank" rel="noopener noreferrer">'+ADDRESS+'</a>'+(cache?'<br>'+esc(tr("provider")+": "+(cache.source==="toncenter"?"Toncenter API v3":"TonAPI v2"))+'<br>'+esc(tr("scanned")+": "+num(cache.scanned))+'<br>'+esc(tr("coverage")+": "+tr("verified")):'')+'</div>';
-}
-function renderTransactions(){
- for(const b of document.querySelectorAll("[data-tx-type]"))b.setAttribute("aria-pressed",String(b.dataset.txType===txType));
- $("tx-reset").hidden=!txRange;$("tx-reset").textContent=tr("txReset");
- if(!m){$("tx-list").innerHTML=placeholder();$("tx-more").hidden=true;$("tx-summary").textContent="";return}
- const r=txRange?{from:Math.max(range.from,txRange.from),to:Math.min(range.to,txRange.to)}:range;
- const rows=rowsInRange(cache.rows,r,txType);
- $("tx-summary").textContent=(txRange?tr("txSelected")+" · "+time(r.from)+" – "+time(r.to-1)+" · ":"")+tr("txCount")+": "+num(rows.length);
- $("tx-list").innerHTML=rows.length?'<div class="tx-list">'+rows.slice(0,txLimit).map(t=>'<div class="tx-row"><div><strong>'+esc(fmt(BigInt(t.v),9).replace(/[.,]0+$/,"").replace(/([.,][0-9]*?[1-9])0+$/,"$1"))+' GRAM</strong><span>'+esc((t.k==="fee"?tr("txFees"):tr("txOther"))+" · "+venueLabel(t.d))+'</span><span>'+esc(time(t.t*1000))+'</span></div><a href="https://tonviewer.com/transaction/'+esc(t.h)+'" target="_blank" rel="noopener noreferrer">'+esc(tr("txLink"))+'</a></div>').join("")+'</div>':'<p class="sub">'+esc(tr("txEmpty"))+'</p>';
- $("tx-more").hidden=rows.length<=txLimit;$("tx-more").textContent=tr("txShow");
+ renderExtras();const items=[...tr("methodItems"),tr("shortRules")];$("method").innerHTML='<ul class="method-list">'+items.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><div class="method-facts">'+esc(tr("collector"))+': <a href="https://tonviewer.com/'+ADDRESS+'" target="_blank" rel="noopener noreferrer">'+ADDRESS+'</a>'+(cache?'<br>'+esc(tr("provider")+": "+(cache.source==="toncenter"?"Toncenter API v3":"TonAPI v2"))+'<br>'+esc(tr("scanned")+": "+num(cache.scanned))+'<br>'+esc(tr("coverage")+": "+tr("verified")):'')+'</div>';
 }
 function renderExtras(){
- const check=audit&&cache&&audit.tip===cache.tip?audit:cache?.audit&&cache.audit.tip===cache.tip?cache.audit:null;
- const auditState=auditing?"auditBusy":check?({match:"auditMatch",mismatch:"auditMismatch",unavailable:"auditUnavailable"}[check.status]||"auditIdle"):"auditIdle";
- $("audit-result").textContent=tr(auditState)+(check&&!auditing?" · "+time(check.asOf):"");
- $("audit-result").className="sub "+(auditState==="auditMismatch"?"audit-warn":"");
+ const check=(!audit||cache?.audit?.asOf>audit.asOf)?cache?.audit:audit;
+ const state=auditing?"auditBusy":check?({match:"auditMatch",mismatch:"auditMismatch",unavailable:"auditUnavailable"}[check.status]||"auditIdle"):"auditIdle";
+ $("audit-result").textContent=tr(state)+(check&&!auditing?" · "+time(check.asOf)+(cache&&check.tip!==cache.tip?" · "+tr("auditPrior"):""):"");
+ $("audit-result").className="sub "+(state==="auditMismatch"?"audit-warn":"");
  $("audit-check").disabled=!cache||auditing;$("audit-check").textContent=tr("auditButton");
  $("audit-meta").textContent=cache?tr("ambiguous")+": "+num(cache.ambiguous)+" · "+tr("chainTip")+": "+time(cache.tipTime*1000):"";
 }
-async function auditSources(){
- if(!cache||auditing)return;const snapshot=cache;auditing=true;renderExtras();
- try{audit=await crossCheck(snapshot)}catch{audit={status:"unavailable",asOf:Date.now(),tip:snapshot.tip}}
- finally{auditing=false;renderExtras()}
+async function auditSources(){if(!cache||auditing)return;const snapshot=cache;auditing=true;renderExtras();try{audit=await crossCheck(snapshot)}catch{audit={status:"unavailable",asOf:Date.now(),tip:snapshot.tip}}finally{auditing=false;renderExtras()}}
+function renderTransactions(){
+ const r=txRange||range,valid=!!m&&!!r;
+ $("tx-filters").querySelectorAll("button").forEach(b=>{b.disabled=!valid;b.setAttribute("aria-pressed",String(b.dataset.txType===txType))});
+ $("tx-reset").hidden=!txRange;$("tx-context").textContent=valid&&txRange?tr("viewInterval")+": "+time(r.from)+" — "+time(r.to-1):"";
+ if(!valid){$("tx-list").innerHTML=placeholder();$("tx-more").hidden=true;$("tx-count").textContent="";return}
+ const rows=rowsInRange(cache.rows,r,txType),shown=rows.slice(0,txLimit);
+ $("tx-count").textContent=tr("txShown")+" "+num(shown.length)+" "+tr("of")+" "+num(rows.length);
+ $("tx-list").innerHTML=shown.length?'<div class="tx-list">'+shown.map(r=>'<article class="tx-row"><div><strong>'+esc(r.k==="fee"?tr("txTypeFee"):tr("txTypeOther"))+'</strong><small>'+esc(venueLabel(r.d))+'</small><small>'+esc(time(r.t*1000))+'</small></div><div class="tx-right"><strong>'+esc(exact(r.v).replace(/(\.\d*?)0+$/,"$1").replace(/\.$/,""))+' GRAM</strong><a href="https://tonviewer.com/transaction/'+esc(r.h)+'" target="_blank" rel="noopener noreferrer">'+esc(tr("txLink"))+' ↗</a></div></article>').join("")+'</div>':placeholder(tr("txEmpty"));
+ $("tx-more").hidden=shown.length>=rows.length;$("tx-more").textContent=tr("more");
 }
+function openTransactions(r,type){txRange=r;txType=type;txLimit=20;const d=$("transaction-section");d.open=true;renderTransactions();d.scrollIntoView({block:"start",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
 function exportCsv(){
- if(!series||!cache)return;
- try{download(new Blob(["\ufeff"+intervalCsv(series,cache.asOf,stale())],{type:"text/csv;charset=utf-8"}),"pepegun-"+selected+"-"+m.anchor+".csv")}catch{exportError=true;updateStatus()}
+ if(!m||!cache)return;
+ try{download(new Blob(["\ufeff"+intervalCsv(series,cache.asOf,stale())],{type:"text/csv;charset=utf-8"}),"pepegun-"+selected+"-"+m.anchor+".csv")}
+ catch{exportError=true;updateStatus()}
 }
 async function exportPng(){
  if(!m||!cache)return;
- const snapshot=m,bins=series.bins,asOf=cache.asOf,old=stale(),label=dateLabel(),currentLang=lang,canvas=document.createElement("canvas");canvas.width=2400;canvas.height=1350;const g=canvas.getContext("2d");if(!g)throw Error("Canvas unavailable");g.scale(2,2);const W=1200,H=675;
+ const snapshot=m,exportSeries=series,asOf=cache.asOf,old=stale(),label=exportDateLabel(),currentLang=lang,exportPreset=selected,canvas=document.createElement("canvas");canvas.width=2400;canvas.height=1840;const g=canvas.getContext("2d");if(!g)throw Error("Canvas unavailable");g.scale(2,2);const W=1200,H=920;
  const palette={bg:"#101211",card:"#171a18",border:"#292e2b",muted:"#a1aaa3",text:"#edf1ee",green:"#b5ef58",paid:"#71c5b3"};
  const font=(n,b=false)=> (b?"600 ":"400 ")+n+"px system-ui, sans-serif";
  function txt(s,x,y,n=16,c=palette.text,b=false,max=Infinity){g.font=font(n,b);while(g.measureText(s).width>max&&n>9)g.font=font(--n,b);g.fillStyle=c;g.fillText(s,x,y)}
@@ -212,32 +211,42 @@ async function exportPng(){
  const loc=currentLang==="ru"?"ru-RU":"en-US",n=x=>new Intl.NumberFormat(loc).format(x),f=x=>amount(x,2,loc);
  const tiles=[[words[currentLang].wallets,n(snapshot.wallets)],[words[currentLang].paying,n(snapshot.paying)],[words[currentLang].revenue,f(snapshot.fee)+" GRAM"],[words[currentLang].payments,n(snapshot.count)]];
  tiles.forEach(([k,v],i)=>{const x=38+i*284;rect(x,100,272,103,palette.card);txt(k,x+15,130,15,palette.muted,false,242);txt(v,x+15,173,32,i===0?palette.green:palette.text,true,242)});
- function draw(x,y,w,h,title,data,series,bar=false){rect(x,y,w,h,palette.card);txt(title,x+16,y+26,17,palette.text,true,w-32);const L=x+45,R=x+w-18,T=y+55,B=y+h-33,pw=R-L,ph=B-T;let max=0;for(const d of data)for(const [k] of series)max=Math.max(max,k==="fee"?Number(d.fee)/1e9:d[k]||0);max=max||1;const at=(i)=>L+(i+.5)*pw/Math.max(1,data.length),py=v=>B-v/max*ph;
- for(let i=0;i<=3;i++){const v=max*i/3,yy=py(v);g.strokeStyle=palette.border;g.beginPath();g.moveTo(L,yy);g.lineTo(R,yy);g.stroke();txt(String(Math.round(v*10)/10),x+7,yy+4,11,palette.muted,false,35)}
- for(const [k,c] of series){if(bar){data.forEach((d,i)=>{const v=Number(d.fee)/1e9,bw=Math.max(.7,Math.min(15,pw/data.length*.7));g.fillStyle=c;g.globalAlpha=d.status==="complete"?1:.45;g.fillRect(at(i)-bw/2,py(v),bw,B-py(v));g.globalAlpha=1})}else{g.strokeStyle=c;g.lineWidth=2.6;g.beginPath();data.forEach((d,i)=>{const px=at(i),yy=py(d[k]||0);i?g.lineTo(px,yy):g.moveTo(px,yy)});g.stroke()}}
- if(data.length){txt(binTick(data[0]),L,B+19,11,palette.muted);const last=binTick(data.at(-1));g.font=font(11);txt(last,R-g.measureText(last).width,B+19,11,palette.muted)}
+ function draw(x,y,w,h,title,data,series,mode="line"){
+ rect(x,y,w,h,palette.card);txt(title,x+16,y+26,17,palette.text,true,w-32);
+ const L=x+54,R=x+w-18,T=y+49,B=y+h-62,pw=R-L,ph=B-T;
+ const val=(d,k)=>k==="fee"?Number(d.fee)/1e9:d[k]||0;let max=0;
+ for(const d of data){max=Math.max(max,...series.map(([k])=>val(d,k)),mode==="stack"?d.active:0)}max=max||1;
+ const at=i=>L+(i+.5)*pw/Math.max(1,data.length),py=v=>B-v/max*ph,bw=Math.max(.6,Math.min(15,pw/Math.max(1,data.length)*.7));
+ for(let i=0;i<=3;i++){const v=max*i/3,yy=py(v);g.strokeStyle=palette.border;g.beginPath();g.moveTo(L,yy);g.lineTo(R,yy);g.stroke();txt(new Intl.NumberFormat(loc,{maximumSignificantDigits:3}).format(v),x+7,yy+4,11,palette.muted,false,45)}
+ if(mode==="bar"||mode==="stack")data.forEach((d,i)=>{let prev=0;for(const [k,c] of series.filter(s=>mode==="bar"||s[0]!=="paying")){const v=val(d,k);g.fillStyle=c;g.globalAlpha=d.status==="complete"?1:.45;g.fillRect(at(i)-bw/2,py(prev+v),bw,py(prev)-py(prev+v));g.globalAlpha=1;prev+=v}});
+ for(const [k,c] of series.filter(s=>mode==="line"||(mode==="stack"&&s[0]==="paying"))){g.strokeStyle=c;g.lineWidth=2;g.beginPath();data.forEach((d,i)=>{const px=at(i),yy=py(val(d,k));i?g.lineTo(px,yy):g.moveTo(px,yy)});g.stroke();if(data.length===1){g.fillStyle=c;g.beginPath();g.arc(at(0),py(val(data[0],k)),2.5,0,Math.PI*2);g.fill()}}
+ if(data.length){const stamp=b=>["15m","1h","3h","6h"].includes(exportSeries.kind)?b.date.slice(5,10)+" "+b.date.slice(11,16):b.date.slice(0,10);txt(stamp(data[0]),L,B+18,11,palette.muted);const last=stamp(data.at(-1));g.font=font(11);if(data.length>1)txt(last,R-g.measureText(last).width,B+18,11,palette.muted)}
+ let xx=x+16;for(const [k,c,label] of series){g.fillStyle=c;g.fillRect(xx,y+h-23,7,7);txt(label,xx+11,y+h-16,11,palette.muted);g.font=font(11);xx+=g.measureText(label).width+27}
  }
- draw(38,223,554,340,words[currentLang].growth,bins,[["cum",palette.green],["cumPay",palette.paid]]);
- draw(608,223,554,340,words[currentLang].feesChart,bins,[["fee",palette.green]],true);
- txt(words[currentLang].allShort+"  /  "+words[currentLang].payingShort,54,552,11,palette.muted,false,500);
- txt(words[currentLang].exportNote,38,610,14,palette.muted,false,1124);
- txt(words[currentLang].collector+": "+ADDRESS,38,635,12,palette.muted,false,1124);
- if(snapshot.anchorIncomplete)txt(words[currentLang].partialDay,38,656,12,palette.muted,false,1124);
- const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error("PNG unavailable")),"image/png"));download(blob,"pepegun-"+selected+"-"+snapshot.anchor+".png");
+ draw(38,223,1124,266,words[currentLang].growth,exportSeries.bins,[["cum",palette.green,words[currentLang].allShort],["cumPay",palette.paid,words[currentLang].payingShort]]);
+ draw(38,505,554,315,words[currentLang].daily,exportSeries.bins,[["new",palette.green,words[currentLang].newShort],["returning","#414f48",words[currentLang].returningShort],["paying",palette.paid,words[currentLang].payingShort]],"stack");
+ draw(608,505,554,315,words[currentLang].feesChart,exportSeries.bins,[["fee",palette.green,"GRAM"]],"bar");
+ txt(words[currentLang].exportNote,38,852,14,palette.muted,false,1124);
+ txt(words[currentLang].collector+": "+ADDRESS,38,878,12,palette.muted,false,1124);
+ if(exportSeries.bins.some(b=>b.status!=="complete"))txt(words[currentLang].partial+" · UTC",38,900,12,palette.muted,false,1124);
+ const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error("PNG unavailable")),"image/png"));download(blob,"pepegun-"+exportPreset+"-"+snapshot.anchor+".png");
 }
 async function refresh(force=false){
- if(busy&&cache!==null)return;
+ if(busy)return;
  busy=true;error=false;progress=null;exportError=false;updateStatus();
  try{const next=await sync(cache,p=>{progress=p;updateStatus()},force);cache=next;storageError=!(await saveCache(next));}
  catch(e){error=true;console.warn("Pepegun sync:",e)}
  finally{busy=false;render()}
 }
 $("language").addEventListener("click",()=>{lang=lang==="ru"?"en":"ru";try{localStorage.setItem("pepegun-lang",lang)}catch{}render()});
-document.querySelectorAll("[data-range]").forEach(b=>b.addEventListener("click",()=>{selected=b.dataset.range;showAll=false;pointsState={};txRange=null;txLimit=20;render()}));
-for(const id of ["from","to"])$(id).addEventListener("change",()=>{pointsState={};showAll=false;render()});
-$("more").addEventListener("click",()=>{showAll=!showAll;renderDetails()});
-$("audit-check").addEventListener("click",auditSources);$("tx-reset").addEventListener("click",()=>{txRange=null;txLimit=20;renderTransactions()});$("tx-more").addEventListener("click",()=>{txLimit+=20;renderTransactions()});for(const b of document.querySelectorAll("[data-tx-type]"))b.addEventListener("click",()=>{txType=b.dataset.txType;txLimit=20;renderTransactions()});$("refresh").addEventListener("click",()=>refresh());$("resync").addEventListener("click",()=>refresh(true));$("csv").addEventListener("click",exportCsv);$("png").addEventListener("click",()=>{exportError=false;updateStatus();exportPng().catch(()=>{exportError=true;updateStatus()})});
-window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{renderCharts();if(m&&$("insights").closest("details").open)renderDetails()},100)});$("insights").closest("details").addEventListener("toggle",()=>{if(m&&$("insights").closest("details").open)renderDetails()});
+document.querySelectorAll("[data-range]").forEach(b=>b.addEventListener("click",()=>{selected=b.dataset.range;historyLimit=14;txRange=null;txLimit=20;pointsState={};render()}));
+for(const id of ["from","to"])$(id).addEventListener("change",()=>{pointsState={};historyLimit=14;txRange=null;txLimit=20;render()});
+$("more").addEventListener("click",()=>{historyLimit=historyLimit>=series.bins.length?14:historyLimit+30;renderDetails()});
+$("tx-filters").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{txType=b.dataset.txType;txLimit=20;renderTransactions()}));
+$("tx-reset").addEventListener("click",()=>{txRange=null;txLimit=20;renderTransactions()});
+$("tx-more").addEventListener("click",()=>{txLimit+=30;renderTransactions()});
+$("audit-check").addEventListener("click",auditSources);$("refresh").addEventListener("click",()=>refresh());$("resync").addEventListener("click",()=>refresh(true));$("csv").addEventListener("click",exportCsv);$("png").addEventListener("click",()=>{exportError=false;updateStatus();exportPng().catch(()=>{exportError=true;updateStatus()})});
+window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(renderCharts,100)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!busy&&(!cache||Date.now()-cache.asOf>=REFRESH))refresh()});
 setInterval(()=>{if(!busy&&document.visibilityState==="visible")refresh()},REFRESH);setInterval(updateStatus,60000);
-render();loadCache().then(async c=>{cache=c||await loadSeed();busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});
+render();loadCache().then(async c=>{if(c){cache=c;render()}const seed=await loadSeed();cache=c&&seed?(BigInt(c.tip)>=BigInt(seed.tip)?c:seed):c||seed;if(seed?.audit&&cache&&(!cache.audit||seed.audit.asOf>cache.audit.asOf))cache.audit=seed.audit;busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});
