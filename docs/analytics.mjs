@@ -1,6 +1,6 @@
 export const ADDRESS="UQD-J5lB6VMC1Cyyz2bLEEflmiG0JRXv7fccO6olayRRqWrc";
 export const RAW="0:fe279941e95302d42cb2cf66cb1047e59a21b42515efedf71c3baa256b2451a9";
-export const DAY=86400000, REFRESH=900000, STALE=1200000, VERSION=3;
+export const DAY=86400000, REFRESH=900000, STALE=1200000, VERSION=4;
 export const dayIndex=t=>Math.floor(t/DAY);
 export const dayKey=d=>new Date(d*DAY).toISOString().slice(0,10);
 export const weekIndex=d=>Math.floor((d+3)/7);
@@ -33,6 +33,14 @@ export function classify(tx){
  if(!tx.success||m.b||!m.s||m.s===RAW||BigInt(m.v)<=0n)return null;
  return {h:tx.h,lt:tx.lt,t:tx.t,s:m.s,v:m.v,k:kind.k,d:kind.d};
 }
+export function minimizeTransaction(t){
+ const r=classify(t),base={h:t.h,lt:t.lt,prev:t.prev,t:t.t,success:!!t.success,m:null};
+ if(r)base.m={s:r.s,v:r.v,b:false,c:"Pepegun"+(r.k==="fee"?" fee":"")+(r.d==="Unlabelled"?"":" · "+r.d)};
+ else if(t.a===true||(commentKind(t.m?.c)?.k==="ambiguous"&&t.success&&t.m?.s&&t.m.s!==RAW&&!t.m.b&&BigInt(t.m.v)>0n))base.a=true;
+ return base;
+}
+export function packTransaction(t){const r=minimizeTransaction(t);return [r.h,r.lt,r.prev,r.t,r.success?1:0,r.m?[r.m.s,r.m.v,r.m.c]:null,r.a?1:0]}
+export function unpackTransaction(a){if(!Array.isArray(a)||a.length!==7||![0,1].includes(a[4])||![0,1].includes(a[6])||(a[5]!==null&&(!Array.isArray(a[5])||a[5].length!==3)))throw Error("Invalid snapshot row");return {h:a[0],lt:a[1],prev:a[2],t:a[3],success:a[4]===1,m:a[5]?{s:a[5][0],v:a[5][1],c:a[5][2],b:false}:null,a:a[6]===1}}
 export function ordered(txs){const m=new Map();for(const t of txs)m.set(t.h,t);return [...m.values()].sort((a,b)=>compareLt(a.lt,b.lt))}
 export function verify(txs,prev){if(!txs.length)return false;let p=prev;for(const tx of txs){if(tx.prev!==p||compareLt(tx.lt,p)<=0)return false;p=tx.lt}return true}
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -81,7 +89,7 @@ function validCache(c){return !!c&&c.version===VERSION&&c.address===RAW&&Array.i
 export function cacheFrom(txs,source,previous=null,now=Date.now()){
  const m=new Map((previous?.rows||[]).map(r=>[r.h,r]));
  for(const tx of txs){const r=classify(tx);if(r)m.set(r.h,r)}
- return {version:VERSION,address:RAW,source,tip:txs.at(-1)?.lt||previous?.tip,tipHash:txs.at(-1)?.h||previous?.tipHash,tipTime:txs.at(-1)?.t||previous?.tipTime,firstTime:previous?.firstTime??txs[0]?.t,asOf:now,scanned:(previous?.scanned||0)+txs.length,ambiguous:(previous?.ambiguous||0)+txs.filter(t=>commentKind(t.m?.c)?.k==="ambiguous"&&t.success&&t.m?.s&&t.m.s!==RAW&&!t.m.b&&BigInt(t.m.v)>0n).length,rows:[...m.values()].sort((a,b)=>a.t-b.t||compareLt(a.lt,b.lt))};
+ return {version:VERSION,address:RAW,source,tip:txs.at(-1)?.lt||previous?.tip,tipHash:txs.at(-1)?.h||previous?.tipHash,tipTime:txs.at(-1)?.t||previous?.tipTime,audit:previous?.audit??null,firstTime:previous?.firstTime??txs[0]?.t,asOf:now,scanned:(previous?.scanned||0)+txs.length,ambiguous:(previous?.ambiguous||0)+txs.filter(t=>t.a===true||(commentKind(t.m?.c)?.k==="ambiguous"&&t.success&&t.m?.s&&t.m.s!==RAW&&!t.m.b&&BigInt(t.m.v)>0n)).length,rows:[...m.values()].sort((a,b)=>a.t-b.t||compareLt(a.lt,b.lt))};
 }
 export async function sync(previous,progress,force=false){
  let last;
@@ -89,7 +97,11 @@ export async function sync(previous,progress,force=false){
   try{
    if(!force&&validCache(previous)){
     const all=await download(source,previous.tip,progress),fresh=all.filter(t=>compareLt(t.lt,previous.tip)>0);
-    if(fresh.length&&verify(fresh,previous.tip))return cacheFrom(fresh,source,previous);
+    if(fresh.length&&verify(fresh,previous.tip)){
+     const anchor=all.find(t=>t.lt===previous.tip);
+     if(anchor&&anchor.h!==previous.tipHash)throw Error("Indexer disagrees at cached tip");
+     return cacheFrom(fresh,source,previous);
+    }
     if(!fresh.length){
      const head=await getPage(source,null,null,1,progress);
      if(head.length===1&&head[0].lt===previous.tip&&head[0].h===previous.tipHash)return cacheFrom([],source,previous);
@@ -97,7 +109,7 @@ export async function sync(previous,progress,force=false){
    }
    const txs=await download(source,null,progress);
    if(!verify(txs,"0"))throw Error("Incomplete or empty full history");
-   if(validCache(previous)&&compareLt(txs.at(-1).lt,previous.tip)<0)throw Error("Indexer behind last verified snapshot");
+   if(validCache(previous)&&(compareLt(txs.at(-1).lt,previous.tip)<0||(txs.at(-1).lt===previous.tip&&txs.at(-1).h!==previous.tipHash)))throw Error("Indexer behind or inconsistent with last verified snapshot");
    return cacheFrom(txs,source);
   }catch(e){last=e}
  }
@@ -109,7 +121,7 @@ export async function saveCache(c){let d;try{d=await db();await new Promise((res
 export function resolveRange(preset,now,first,custom){
  const today=dayIndex(now),end=now+1;let from;
  if(preset==="all")from=dayIndex(first??now)*DAY;
- else if(preset==="24h")from=now-DAY;
+ else if(preset==="6h"||preset==="24h")from=now-(preset==="6h"?DAY/4:DAY);
  else if(preset==="7d"||preset==="30d")from=(today-(preset==="7d"?6:29))*DAY;
  else{
   const date=s=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(s||""))return NaN;const t=Date.parse(s+"T00:00:00Z");return Number.isFinite(t)&&dayKey(dayIndex(t))===s?t:NaN};
