@@ -42,3 +42,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v20 collector address
 - Replaced full inline address with a single-line first/last 12-character abbreviation and copy control for the exact full address. Removed the redundant break before provider information. Clipboard success indicated by a checkmark; manual selectable address provided if copying fails. Explorer footer link and all analytics unchanged.
+
+## v21 per-card PNG export
+- Approved scope: overview (four metrics together), active wallets, new/returning wallets, growth, activity and fees charts. No venue/detail/transaction/method exports. Touch hold 600ms or desktop context menu; cancel on movement/scroll; chart plots and buttons excluded. Keyboard Enter/Shift+F10 available. One hint. Dialog with download and native file share when supported. Export uses frozen displayed values and existing SVG chart (including selected point), current period and data timestamp, original pepegun-logo.svg, independent branding and source URL. No third-party dependencies; original full dashboard exports unchanged. Real mobile browser and file-share behavior require verification.

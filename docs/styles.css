@@ -341,3 +341,16 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 .footer-link.footer-bot{border:1px solid transparent;background:linear-gradient(#1a2417,#1a2417) padding-box,linear-gradient(110deg,var(--accent),var(--secondary),var(--border),var(--accent),var(--secondary),var(--accent)) border-box;background-size:100% 100%,300% 100%;animation:audit-sweep 2.4s linear infinite}
 .footer-link.footer-bot:hover{background:linear-gradient(#26351e,#26351e) padding-box,linear-gradient(110deg,var(--accent),var(--secondary),var(--border),var(--accent),var(--secondary),var(--accent)) border-box;background-size:100% 100%,300% 100%}
 @media(prefers-reduced-motion:reduce){.footer-link.footer-bot{animation:none}}
+
+/* v21: optional card export; chart and transaction interaction stay unchanged. */
+.card-export-hint{font-size:11px;color:var(--muted);text-align:center;margin:0 0 8px;line-height:1.4}
+[data-card-export]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+[data-card-export] .chart-tx{-webkit-touch-callout:default}
+#card-export-menu{box-sizing:border-box;width:min(420px,calc(100% - 32px));max-height:calc(100% - 32px);padding:0;border:1px solid var(--border);border-radius:var(--radius);background:var(--raised);color:var(--text);overflow:auto}
+#card-export-menu::backdrop{background:rgba(0,0,0,.65)}
+.card-export-sheet{display:grid;gap:10px;padding:18px;text-align:center}
+.card-export-sheet h2{font-size:16px;line-height:1.4}
+.card-export-sheet .sub:empty{display:none}
+.card-export-sheet .outline{width:100%;min-height:44px}
+#card-export-download:not(:disabled){color:var(--accent);border-color:var(--accent);background:#1a2417}
+#card-export-cancel{border-color:transparent}

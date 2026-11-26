@@ -1,3 +1,4 @@
+import {setupCardExport} from "./card-export.mjs?v=21";
 import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,validAudit} from "./analytics.mjs?v=10";
 import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=10";
 const words={
@@ -375,7 +376,7 @@ function render(){
  ].join("");
  $("active").innerHTML='<div class="activity-title"><strong>'+esc(tr("active"))+'</strong><small>'+esc(tr("calendarWindows")+(m?" · "+utcDate(Date.parse(m.anchor+"T00:00:00Z"),true):""))+'</small></div>'+[["today","dau"],["week","wau"],["month","mau"]].map(([k,v])=>'<div class="active-stat"><strong>'+esc(m?num(m.activity[v]):"—")+'</strong><small>'+esc(tr(k))+'</small></div>').join("");
  $("finite").hidden=selected==="all"||!m;$("finite").innerHTML=m?kpi(tr("new"),num(m.newWallets),tr("firstSeen"))+kpi(tr("returning"),num(m.returning),tr("seenBefore")):"";
- renderCharts();renderDetails();renderTransactions();updateStatus();
+ renderCharts();renderDetails();renderTransactions();updateStatus();updateCardExport();
 }
 const colors={all:"#b5ef58",paid:"#71c5b3",new:"#a8d956",returning:"#414f48",fee:"#a8d956",grid:"#292e2b",text:"#919c95"};
 const fnum=(x,step=1)=>new Intl.NumberFormat(locale(),{maximumFractionDigits:Math.max(0,Math.min(9,Math.ceil(-Math.log10(step))+1)),notation:x>=100000?"compact":"standard"}).format(x);
@@ -559,4 +560,5 @@ $("audit-check").addEventListener("click",auditSources);$("refresh").addEventLis
 window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(renderCharts,100)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!busy&&(!cache||Date.now()-cache.asOf>=REFRESH))refresh()});
 setInterval(()=>{if(!busy&&document.visibilityState==="visible")refresh()},REFRESH);setInterval(updateStatus,60000);
+const updateCardExport=setupCardExport(()=>({valid:!!m&&!!cache,lang,period:rangeNote(),asOf:cache?time(cache.asOf):"",anchor:m?.anchor||"",stale:stale()}),download);
 render();loadCache().then(async c=>{if(c){cache=c;render()}const seed=await loadSeed();cache=selectSnapshot(c,seed);if(cache&&seed&&seed.tip===cache.tip&&seed.tipHash===cache.tipHash&&validAudit(seed.audit,cache.tip)&&(!cache.audit||seed.audit.asOf>cache.audit.asOf))cache.audit=seed.audit;busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});
