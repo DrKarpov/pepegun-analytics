@@ -89,6 +89,9 @@ const words={
     "coverage": "History coverage",
     "verified": "Continuous account history",
     "collector": "Fee collector",
+    "copyAddress": "Copy full address",
+    "addressCopied": "Address copied",
+    "copyAddressFailed": "Copy manually from the field below",
     "exportNote": "Wallets are addresses, not people. Independent on-chain dashboard.",
     "methodItems": [
       "Data comes from the single public fee collector on TON via Toncenter API v3 or TonAPI v2. Every full download must form an unbroken transaction chain back to the account's first transaction.",
@@ -242,6 +245,9 @@ const words={
     "coverage": "Полнота истории",
     "verified": "Непрерывная история адреса",
     "collector": "Комиссионный кошелёк",
+    "copyAddress": "Скопировать полный адрес",
+    "addressCopied": "Адрес скопирован",
+    "copyAddressFailed": "Скопируйте адрес вручную из поля ниже",
     "exportNote": "Кошельки — адреса, а не люди. Независимая ончейн-аналитика.",
     "methodItems": [
       "Данные одного публичного комиссионного кошелька в TON получаются через Toncenter API v3 или TonAPI v2. Полная выгрузка должна образовывать непрерывную цепочку до первой транзакции адреса.",
@@ -452,8 +458,25 @@ function renderDetails(){
  const rows=[...series.bins].reverse();$("history").innerHTML=rows.length?table([tr("interval"),tr("activeShort"),tr("newShort"),tr("returningShort"),tr("payingShort"),tr("newPayShort"),tr("count"),tr("fee")+" (GRAM)"],rows.slice(0,historyLimit).map(d=>[esc(intervalLabel(d))+(d.status==="complete"?"":'<div class="date-status">'+esc(statusLabel(d.status))+'</div>'),...[d.active,d.new,d.returning,d.paying,d.newPay,d.count].map(x=>esc(num(x))),esc(money(d.fee))])):placeholder();
  $("more").hidden=rows.length<=14;$("more").textContent=tr(historyLimit>=rows.length?"less":"more");
  }
- renderExtras();const items=[...tr("methodItems"),tr("shortRules")];$("method").innerHTML='<ul class="method-list">'+items.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><div class="method-facts">'+esc(tr("collector"))+':<span class="collector-address">'+ADDRESS+'</span>'+(cache?'<br>'+esc(tr("provider")+": "+(cache.source==="toncenter"?"Toncenter API v3":"TonAPI v2"))+'<br>'+esc(tr("scanned")+": "+num(cache.scanned))+'<br>'+esc(tr("coverage")+": "+tr("verified")):'')+'</div>';
+ renderExtras();const items=[...tr("methodItems"),tr("shortRules")];$("method").innerHTML='<ul class="method-list">'+items.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><div class="method-facts">'+esc(tr("collector"))+':<div class="collector-row"><span class="collector-address" title="'+esc(ADDRESS)+'">'+esc(ADDRESS.slice(0,12)+"…"+ADDRESS.slice(-12))+'</span><button type="button" id="copy-address" class="collector-copy" aria-label="'+esc(tr("copyAddress"))+'" title="'+esc(tr("copyAddress"))+'"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button></div><span id="copy-status" class="copy-status" role="status" aria-live="polite"></span><input id="copy-fallback" class="copy-fallback" type="text" readonly value="'+esc(ADDRESS)+'" aria-label="'+esc(tr("copyAddress"))+'" hidden>'+(cache?esc(tr("provider")+": "+(cache.source==="toncenter"?"Toncenter API v3":"TonAPI v2"))+'<br>'+esc(tr("scanned")+": "+num(cache.scanned))+'<br>'+esc(tr("coverage")+": "+tr("verified")):'')+'</div>';
 }
+
+async function copyCollectorAddress(button){
+ const status=$("copy-status"),fallback=$("copy-fallback");if(!status||!fallback)return;
+ let copied=false;
+ try{await navigator.clipboard.writeText(ADDRESS);copied=true}catch{
+  try{fallback.hidden=false;fallback.focus();fallback.select();fallback.setSelectionRange(0,ADDRESS.length);copied=document.execCommand("copy")}catch{}
+ }
+ if(!button.isConnected)return;
+ if(copied){
+  fallback.hidden=true;status.classList.remove("copy-error");status.textContent=tr("addressCopied");
+  button.classList.add("copied");button.title=tr("addressCopied");button.setAttribute("aria-label",tr("addressCopied"));
+  button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>';
+  setTimeout(()=>{if(!button.isConnected)return;button.classList.remove("copied");button.title=tr("copyAddress");button.setAttribute("aria-label",tr("copyAddress"));button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';status.textContent=""},1800);
+ }else{fallback.hidden=false;status.classList.add("copy-error");status.textContent=tr("copyAddressFailed");fallback.focus();fallback.select()}
+}
+$("method").addEventListener("click",event=>{const button=event.target.closest("#copy-address");if(button&&!button.classList.contains("copied"))copyCollectorAddress(button)});
+
 function renderExtras(){
  const check=(!audit||cache?.audit?.asOf>audit.asOf)?cache?.audit:audit;
  const state=auditing?"auditBusy":check?({match:"auditMatch",mismatch:"auditMismatch",unavailable:"auditUnavailable"}[check.status]||"auditIdle"):"auditIdle";

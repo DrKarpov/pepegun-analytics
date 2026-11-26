@@ -317,7 +317,15 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 #method-section[open]{background:var(--raised)}
 #method-section .method-list{margin-block:10px 14px;padding-inline-start:18px}
 #method-section .method-facts{padding-block:12px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-.collector-address{display:block;color:var(--text);font-size:12px;overflow-wrap:anywhere;word-break:normal;margin:3px 0 8px}
+.collector-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:center;gap:4px;margin:0 0 4px}
+.collector-address{display:block;min-width:0;color:var(--text);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.collector-copy{display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted)}
+.collector-copy svg{width:17px;height:17px;display:block}
+.collector-copy:hover,.collector-copy.copied{color:var(--accent)}
+.copy-status:not(.copy-error){position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.copy-status.copy-error{display:block;color:var(--muted);margin-bottom:4px}
+.copy-fallback{display:block;width:100%;min-width:0;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px;margin:0 0 8px;font-size:12px}
+@media(max-width:350px){.collector-address{font-size:11px}}
 #method-section .insight-actions{display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;gap:7px;margin-block:12px 16px}
 #method-section .insight-actions .sub{width:100%;margin:0;text-align:center;overflow-wrap:anywhere}
 #audit-check{width:min(100%,310px);min-height:44px;max-width:100%;padding:8px 16px;border:1px solid var(--accent);border-radius:999px;background:#1a2417;color:var(--accent);font-size:12px;font-weight:600;text-align:center;line-height:1.4;white-space:normal}

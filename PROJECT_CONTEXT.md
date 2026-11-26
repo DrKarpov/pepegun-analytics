@@ -39,3 +39,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v19 date labels and footer
 - Removed redundant UTC from custom date input captions in EN/RU and initial HTML; UTC range annotation and all time calculations unchanged. PepeGunBot footer link uses the existing audit-sweep border animation, preserving button dimensions and reduced-motion preference. Tonviewer unchanged.
+
+## v20 collector address
+- Replaced full inline address with a single-line first/last 12-character abbreviation and copy control for the exact full address. Removed the redundant break before provider information. Clipboard success indicated by a checkmark; manual selectable address provided if copying fails. Explorer footer link and all analytics unchanged.
