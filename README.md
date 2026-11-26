@@ -6,26 +6,17 @@ Independent on-chain analytics for the Pepegun fee collector on TON.
 
 ## Features
 
-- Wallet activity, audience growth and retention
-- Fee revenue and payment statistics
-- Activity by venue label
-- Custom date ranges and CSV/PNG exports
+- Wallet activity, audience growth, return rates and fee concentration
+- Adaptive charts from 15-minute to monthly intervals
+- Fee revenue in GRAM, comparable periods, transaction links and CSV/PNG exports
 - English and Russian interfaces
-- Data refresh every 15 minutes while the page is open
+- Refresh every 15 minutes while open
 
 ## Data
 
-Transaction history is retrieved from Toncenter API v3 or TonAPI v2.
+Public transaction history is retrieved from Toncenter API v3 or TonAPI v2. A daily GitHub Actions snapshot retains only fields needed for analytics and continuity checks. The secondary indexer is checked when available. Wallets are addresses, not people. Labelled fees are gross incoming transfers, not profit or verified trade count. All times are UTC.
 
 [Fee collector on Tonviewer](https://tonviewer.com/UQD-J5lB6VMC1Cyyz2bLEEflmiG0JRXv7fccO6olayRRqWrc)
-
-Wallet counts represent unique addresses, not individual users. Fee revenue represents gross incoming transfers labelled as fees, not net profit. All calendar periods use UTC.
-
-## Extended analytics
-
-Detailed statistics include median fees, revenue per paying address, fee concentration, new payers and comparable prior periods. Source comparison runs on request against the same transaction tip. Historical USD estimates use DefiLlama daily prices when available.
-
-The public history snapshot is generated daily by GitHub Actions (also runnable manually). It contains normalized public account history, not estimated counters. On a first visit the dashboard validates the available snapshot before fetching newer transactions. If the snapshot is unavailable, it downloads the complete history from the indexer. To generate it locally, run `node scripts/snapshot.mjs`.
 
 ## Development
 
@@ -35,4 +26,4 @@ node tests/analytics.test.mjs
 node tests/insights.test.mjs
 ```
 
-This is an independent project, not an official Pepegun product.
+Independent project, not an official Pepegun product.
