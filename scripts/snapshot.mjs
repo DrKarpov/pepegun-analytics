@@ -1,5 +1,5 @@
 import {readFile,writeFile,rename} from "node:fs/promises";
-import {ADDRESS,RAW,VERSION,download,verify,packTransaction,unpackTransaction,cacheFrom,crossCheck,compareLt,compareSnapshots} from "../docs/analytics.mjs";
+import {ADDRESS,RAW,VERSION,download,verify,packTransaction,unpackTransaction,cacheFrom,crossCheck,compareLt,compareSnapshots,auditResult} from "../docs/analytics.mjs";
 const file=new URL("../docs/snapshot.json",import.meta.url),tmp=new URL("../docs/snapshot.json.tmp",import.meta.url);
 let prior=null,last;
 try{prior=JSON.parse(await readFile(file,"utf8"))}catch{}
@@ -15,7 +15,7 @@ for(const source of ["toncenter","tonapi"]){
  }
  const asOf=Date.now(),cache=cacheFrom(transactions,source,null,asOf);
  let audit;
- try{audit=await crossCheck(cache)}catch{audit={status:"unavailable",tip:cache.tip,asOf:Date.now()}}
+ try{audit=await crossCheck(cache,p=>{if(p.pages)console.log("Audit",p.source,p.pages,p.scanned)})}catch(error){console.warn("Audit unavailable:",error.message);audit=auditResult(cache,"unavailable",{source:source==="toncenter"?"tonapi":"toncenter"})}
  if(audit.status==="mismatch")throw Object.assign(Error("Indexers disagree at the same transaction tip"),{sourceMismatch:true});
  const snapshot={version:VERSION,address:RAW,source,asOf,audit,transactions:transactions.map(packTransaction)};
  await writeFile(tmp,JSON.stringify(snapshot));await rename(tmp,file);
