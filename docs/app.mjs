@@ -335,7 +335,7 @@ function updateStatus(){
  if(exportError)note+=(note?" ":"")+tr("noExport");
  $("notice").hidden=!note;$("notice").className="notice "+(error&&!cache?"error":"");$("notice").textContent=note;
 }
-const kpi=(label,value,hint="",accent=false,unit="")=>'<article class="kpi'+(accent?' primary':'')+'"><div class="kpi-label">'+esc(label)+'</div><div class="kpi-value">'+esc(value)+(unit?'<small>'+esc(unit)+'</small>':'')+'</div><div class="kpi-hint">'+esc(hint)+'</div></article>';
+const kpi=(label,value,hint="",accent=false,unit="")=>'<article class="kpi'+(accent?' primary':'')+'"><div class="kpi-label">'+esc(label)+'</div><div class="kpi-value">'+esc(value)+'</div><div class="kpi-hint">'+(unit?'<small class="kpi-unit">'+esc(unit)+'</small>':'')+(unit&&hint?' · ':'')+esc(hint)+'</div></article>';
 const placeholder=(message=tr(cache?"noData":"noHistory"))=>'<div class="placeholder">'+esc(message)+'</div>';
 function setDates(){
  if(!cache)return;

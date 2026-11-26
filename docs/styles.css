@@ -272,3 +272,32 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 #comparison>.sub{text-align:center;overflow-wrap:anywhere}
 @media(max-width:520px){.statusline{padding-inline-start:14px}.date-fields{gap:10px}.date-fields input{padding-inline:6px}}
 @media(max-width:350px){.statusline{padding-inline-start:12px}.date-fields input{padding-inline:4px;font-size:11px}}
+
+/* v15: shared metric rows and centered native date controls. */
+.refresh{position:relative;border-color:transparent;border-radius:8px;background:transparent;color:var(--muted)}
+.refresh::before{content:"";position:absolute;inset:5px;border:1px solid var(--border);border-radius:50%;background:var(--card);pointer-events:none}
+.refresh svg{position:relative;width:19px;height:19px}
+.refresh:hover:not(:disabled){border-color:transparent;background:transparent;color:var(--accent)}
+.refresh:hover:not(:disabled)::before{border-color:var(--accent);background:var(--raised)}
+.refresh:focus-visible{border-radius:50%}
+.date-fields input{height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;padding-block:0;line-height:normal;border-color:#52653d;background:#1a2417;font-weight:500}
+.date-fields input::-webkit-date-and-time-value{display:flex;align-items:center;justify-content:center;height:42px;line-height:42px;margin:0;padding:0;text-align:center}
+.date-fields input::-webkit-datetime-edit{display:flex;align-items:center;justify-content:center;min-width:0;padding:0;line-height:normal}
+.date-fields input::-webkit-calendar-picker-indicator{flex-shrink:0;margin:0;padding:0}
+.date-fields input:focus{border-color:var(--accent)}
+.kpi{align-content:start;align-items:center;grid-template-rows:minmax(2.7em,auto) auto minmax(2.8em,auto)}
+.kpi-label{color:#cbd3cd;font-weight:500;align-self:center}
+.kpi-value{align-self:center;line-height:1.18}
+.kpi-hint{display:block;align-self:start;min-height:1.4em}
+.kpi-hint:empty{display:block;visibility:hidden}
+.kpi-hint .kpi-unit{font:inherit;letter-spacing:.02em}
+.activity-title strong,.chart-card h2,.detail h2,.detail h3,.detail summary{color:var(--text)}
+.advanced-grid>div{display:grid;grid-template-rows:minmax(2.7em,auto) auto;align-items:center;justify-items:center;align-content:start}
+.return-grid>div{display:grid;grid-template-rows:minmax(2.7em,auto) auto auto;align-items:center;justify-items:center;align-content:start}
+.return-grid strong{margin:0}
+@supports(grid-template-rows:subgrid){
+ .kpis,.secondary{grid-auto-rows:auto;row-gap:0}
+ .kpis>.kpi,.secondary>.kpi{grid-row:span 3;grid-template-rows:subgrid;row-gap:5px;align-content:normal}
+ .advanced-grid>div{grid-row:span 2;grid-template-rows:subgrid}
+ .return-grid>div{grid-row:span 3;grid-template-rows:subgrid}
+}

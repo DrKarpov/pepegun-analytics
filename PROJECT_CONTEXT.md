@@ -22,3 +22,7 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## Handoff verification
 - v14 candidate is based on v12 HTML/CSS plus narrow overrides only; the previous v13 commit is retained in history. Verify actual mobile Safari/desktop display and compare both languages, custom date input behavior, upper tabs and KPI layout before declaring UI accepted. A real-device Safari check has not yet been performed.
+
+## v15 visual follow-up
+- User rejected v14 visual misalignment: native date value was too high; fee amount and payment count were not aligned; headings too bold; refresh button too heavy. v15 shares label/value/hint grid rows across neighboring KPI cards, uses the existing hint row for GRAM, aligns detailed and return cards, softens labels, and adjusts native date controls and refresh icon. Only the KPI HTML template in app.mjs changes, not calculations or data.
+- Local Chromium fixture passed 20 width/language combinations (320, 350, 375, 393, 414, 520, 768, 800, 1024, 1440 px × RU/EN) for KPI alignment and date non-overlap. This was a layout fixture, not the complete live site or iOS Safari. Real Safari display and live deployment still require verification.
