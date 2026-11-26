@@ -1,6 +1,6 @@
 import {setupCardExport} from "./card-export.mjs?v=30";
-import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=30";
-import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=30";
+import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=31";
+import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=31";
 const words={
   "en": {
     "subtitle": "Independent on-chain analytics",
@@ -155,7 +155,7 @@ const words={
     "trustMismatch": "Sources disagree",
     "trustPrior": "Earlier history checked",
     "trustUnavailable": "Cross-check unavailable",
-    "trustUnchecked": "Not cross-checked",
+    "trustUnchecked": "Awaiting cross-check",
     "calendarWindows": "UTC calendar windows",
     "txShown": "Shown",
     "of": "of",
@@ -315,7 +315,7 @@ const words={
     "trustMismatch": "Источники расходятся",
     "trustPrior": "Проверена ранняя история",
     "trustUnavailable": "Сверка недоступна",
-    "trustUnchecked": "Без сверки источников",
+    "trustUnchecked": "Ожидается сверка",
     "calendarWindows": "Календарные дни UTC",
     "txShown": "Показано",
     "of": "из",
@@ -351,12 +351,12 @@ function updateStatus(){
  $("refresh").classList.toggle("loading",busy);$("refresh").disabled=busy;$("resync").disabled=busy;
  let note="";
  if(busy&&!cache&&progress)note=progress.retry?tr("retry"):tr("downloading")+" · "+num(progress.scanned||0)+" "+tr("transactions");
- else if(error)note=tr(cache?"cachedError":"noCache");
- else if(isOld)note=tr("oldCache");
- if(cache&&warning&&(trust==="mismatch"||isOld||busy))note+=(note?" ":"")+tr(warning);
+ else if(error&&!cache)note=tr("noCache");
+ // Sync/audit state stays in the compact status row. Never insert a second panel when cached data exists.
+ s.title=cache?[warning?tr(warning):"",error?tr("cachedError"):isOld?tr("oldCache"):""].filter(Boolean).join(" · "):"";
  if(storageError)note+=(note?" ":"")+tr("persist");
  if(exportError)note+=(note?" ":"")+tr("noExport");
- $("notice").hidden=!note;$("notice").className="notice "+(error&&!cache||trust==="mismatch"?"error":"");$("notice").textContent=note;
+ $("notice").hidden=!note;$("notice").className="notice "+(error&&!cache?"error":"");$("notice").textContent=note;
 }
 const kpi=(label,value,hint="",accent=false,unit="")=>'<article class="kpi'+(accent?' primary':'')+'"><div class="kpi-label">'+esc(label)+'</div><div class="kpi-value">'+esc(value)+'</div><div class="kpi-hint">'+(unit?'<small class="kpi-unit">'+esc(unit)+'</small>':'')+(unit&&hint?' · ':'')+esc(hint)+'</div></article>';
 const placeholder=(message=tr(cache?"noData":"noHistory"))=>'<div class="placeholder">'+esc(message)+'</div>';
