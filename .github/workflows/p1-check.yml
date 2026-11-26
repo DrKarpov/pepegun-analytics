@@ -22,7 +22,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -45,6 +45,10 @@ jobs:
           npx playwright install --with-deps chromium webkit
       - name: Verify dashboard in Chromium and WebKit
         run: node tests/p1-browser.test.mjs
+      - name: Compare UI and exports with verified P2 baseline
+        run: |
+          git fetch --no-tags --depth=1 origin 68c8a0da7a5b4293395bdf1018f117f03e6a6a9f
+          node tests/p3-browser.test.mjs
       - name: Save browser screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
