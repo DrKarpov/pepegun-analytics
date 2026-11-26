@@ -306,6 +306,9 @@ async function incrementalAudit(snapshot,checkpoint,source,progress,signal){
  const changedPrefixRow=txs=>txs.some(tx=>{
   if(compareLt(tx.lt,checkpoint.tip)>0)return false;
   const row=prefixRows.get(tx.lt),observed=classify(tx);
+  // The cache only stores the total ambiguous count, not its per-LT membership.
+  // When a returned unclassified prefix row could affect that count, recheck all.
+  if(!row&&!observed&&(checkpoint.ambiguous>0||minimizeTransaction(tx).a===true))return true;
   return JSON.stringify(row?canonicalRows([row])[0]:null)!==JSON.stringify(observed?canonicalRows([observed])[0]:null);
  });
  // For an unchanged tip, independently verify the alternate indexer's head.
