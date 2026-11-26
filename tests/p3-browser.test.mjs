@@ -129,6 +129,32 @@ try{
      assert.deepEqual(await pngPixels(b.page,before.png,after.png),{sameSize:true,ratio:0},name+" "+lang+" "+id+" PNG pixels");
     }
    }
+   // Compare the hold-state presentation without racing the 600 ms gesture.
+   // The existing interaction suite independently exercises actual hold/cancel.
+   const hold=async page=>{
+    await page.emulateMedia({reducedMotion:"no-preference"});
+    await page.evaluate(()=>document.querySelector("#overview").classList.add("export-holding"));
+    await wait(300);
+    const state=await page.evaluate(()=>{const el=document.querySelector("#overview"),c=getComputedStyle(el),p=getComputedStyle(el,"::after");return {transform:c.transform,z:c.zIndex,opacity:p.opacity,animation:p.animationName,duration:p.animationDuration,background:p.backgroundImage,border:p.border,padding:p.padding,mask:p.maskImage}});
+    await page.evaluate(()=>document.querySelector("#overview").classList.remove("export-holding"));
+    await page.emulateMedia({reducedMotion:"reduce"});
+    return state;
+   };
+   assert.deepEqual(await hold(b.page),await hold(a.page),name+" hold-state computed presentation");
+   // Clipboard API denial plus legacy copy failure must reveal the complete
+   // manually selectable collector address. This is a simulated failure path,
+   // not evidence of real-device clipboard permission or native sharing.
+   for(const {page} of [a,b]){
+    await page.evaluate(()=>{
+     document.querySelector("#method-section").open=true;
+     Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async()=>{throw Error("denied by fixture")}}});
+     document.execCommand=()=>false;
+    });
+    await page.locator("#copy-address").click();
+    await until(page,()=>!document.querySelector("#copy-fallback").hidden&&document.querySelector("#copy-status").classList.contains("copy-error"));
+    const copy=await page.locator("#copy-fallback").inputValue();
+    assert.equal(copy,"UQD-J5lB6VMC1Cyyz2bLEEflmiG0JRXv7fccO6olayRRqWrc");
+   }
    assert.deepEqual(a.errors,[]);assert.deepEqual(b.errors,[]);
    await a.context.close();await b.context.close();
    console.log(name,"P3 baseline comparisons and all PNG/CSV exports verified");
