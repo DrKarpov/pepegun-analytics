@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {RAW,cacheFrom,compareSnapshots,verify,validCache,mapTx,crossCheck,packTransaction,unpackTransaction} from "../docs/analytics.mjs";
+import {RAW,cacheFrom,compareSnapshots,verify,validCache,mapTx,crossCheck,sync,packTransaction,unpackTransaction} from "../docs/analytics.mjs";
 const hash=i=>String(i).padStart(64,"0");
 const t=[1,2,3].map(i=>({h:hash(i),lt:String(i),prev:String(i-1),prevHash:hash(i-1),t:100+i,success:true,m:null}));
 const c=cacheFrom(t,"toncenter"),other=cacheFrom(t,"tonapi");
@@ -22,4 +22,29 @@ const common={hash:hash(2),lt:"2",prev_trans_lt:"1",prev_trans_hash:hash(1)};
 assert.equal(mapTx({...common,account:RAW,now:102,description:{aborted:false}},"toncenter").prevHash,hash(1));
 assert.equal(mapTx({...common,account:{address:RAW},utime:102,aborted:false,success:true},"tonapi").prevHash,hash(1));
 assert.throws(()=>mapTx({...common,prev_trans_lt:undefined,account:{address:RAW},utime:102,aborted:false,success:true},"tonapi"));
-console.log("P1 initial identity regression checks passed");
+// Network fixtures: exercise sync without downloading live data.
+const apiTx=x=>({account:RAW,hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,now:x.t,description:{aborted:false}});
+const originalFetch=globalThis.fetch;
+let requests=[];
+const install=handler=>{requests=[];globalThis.fetch=async input=>{const u=new URL(input);requests.push(u);return {ok:true,json:async()=>({transactions:handler(u).map(apiTx)})}}};
+try{
+ const prev=cacheFrom(t.slice(0,2),"toncenter");
+ install(u=>u.searchParams.has("start_lt")?[t[2]]:[...t].reverse());
+ const next=await sync(prev);
+ assert.ok(compareSnapshots(next,c));
+ assert.equal(requests.length,1);
+ // If previous hash is unavailable, a fresh-only page cannot establish an anchor.
+ const noHash={...t[2],prevHash:undefined};
+ install(u=>u.searchParams.has("start_lt")?[noHash]:[...t].reverse());
+ assert.ok(compareSnapshots(await sync(prev),c));
+ assert.equal(requests.length,2);
+ // A legacy cache is rebuilt instead of extended without full identity.
+ install(()=>[...t].reverse());
+ assert.ok(compareSnapshots(await sync(legacy),c));
+ assert.equal(requests.length,1);
+ // Compare alternate source at the common tip even if the alternate has newer rows.
+ const newer={h:hash(4),lt:"4",prev:"3",prevHash:hash(3),t:104,success:true,m:null};
+ globalThis.fetch=async()=>({ok:true,json:async()=>({transactions:[newer,...t.slice().reverse()].map(x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true}))})});
+ assert.equal((await crossCheck(c)).status,"match");
+}finally{globalThis.fetch=originalFetch}
+console.log("P1 identity regression checks passed");
