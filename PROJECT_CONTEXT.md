@@ -63,3 +63,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v27 translucent preview and quieter interface
 - User requested subtle green translucent preview surface, with no visible Preview heading or persistent card export instruction. Preview uses 88% opaque dark green with backdrop blur and solid fallback; PNG itself stays opaque and unchanged. Dialog accessible heading and card aria-description remain available to assistive technology. No tracking, backend or new stored preferences. Hold timing, share/download and analytics unchanged.
+
+## v28 tighter preview and PNG header
+- Remove the visible close icon and its header row; retain the accessible dialog title without occupying layout, outside-tap and Escape dismissal. Green glass surface uses 48% opacity with 5px blur and 30% backdrop darkness (translucent fallback). Individual PNG removes the redundant as-of timestamp and its vertical space; centered branding and green period remain, UTC only on timed ranges. If the data is stale, keep its existing cached-data warning in the green period line only. All six card exports share this renderer. Global export and analytics unchanged.

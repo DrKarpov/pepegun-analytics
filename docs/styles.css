@@ -364,15 +364,11 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 @keyframes export-out{from{opacity:1;transform:scale(1)}to{opacity:0;transform:translateY(5px) scale(.98)}}
 @keyframes export-fade{from{opacity:0}to{opacity:1}}
 .card-export-sheet{display:grid;gap:8px;padding:12px;text-align:center}
-.card-export-heading{position:relative;display:grid;place-items:center;min-height:36px;padding-inline:40px}
-.card-export-heading h2{font-size:14px;font-weight:600;line-height:1.4}
-#card-export-cancel{position:absolute;right:-3px;top:-4px;display:grid;place-items:center;width:44px;height:44px;padding:0;background:transparent;border:0;color:var(--muted);border-radius:8px}
-#card-export-cancel svg{width:18px;height:18px}
 .card-export-sheet .sub{margin:0}
 .card-export-sheet .sub:empty{display:none}
 #card-export-preview-frame{min-width:0;max-width:100%;overflow:hidden;border-radius:8px;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 #card-export-preview-frame[hidden]{display:none}
-#card-export-preview{display:block;max-width:100%;width:100%;height:auto;max-height:calc(100vh - 170px);max-height:calc(100dvh - 170px);object-fit:contain;border-radius:8px;pointer-events:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+#card-export-preview{display:block;max-width:100%;width:100%;height:auto;max-height:calc(100vh - 108px);max-height:calc(100dvh - 108px);object-fit:contain;border-radius:8px;pointer-events:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .card-export-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .card-export-actions.single{grid-template-columns:minmax(0,1fr)}
 .card-export-actions .outline{width:100%;min-width:0;min-height:44px;border-radius:999px;border:1px solid var(--accent);background:#1a2417;color:var(--accent);padding-inline:6px;font-weight:600;white-space:normal}
@@ -384,17 +380,12 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 html[data-input-mode="pointer"] :is(button,a,input,summary,[tabindex],svg):focus,
 html[data-input-mode="pointer"] :is(button,a,input,summary,[tabindex],svg):focus-visible{outline:none!important}
 #card-export-menu:focus,#card-export-menu:focus-visible,#card-export-title:focus{outline:none}
-#card-export-cancel:focus-visible{outline:none;color:var(--accent)}
-html[data-input-mode="pointer"] #card-export-cancel:focus{color:var(--muted)}
-html[data-input-mode="keyboard"] #card-export-cancel:focus-visible{background:var(--card);color:var(--accent)}
 
 /* v27: subtly translucent green preview, without visible redundant labels. */
-#card-export-menu{background:#1d261d;border-color:#414f48}
+#card-export-menu{background:rgba(29,38,29,.54);border-color:#414f48}
 @supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
- #card-export-menu{background:rgba(29,38,29,.88);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+ #card-export-menu{background:rgba(29,38,29,.48);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
 }
-#card-export-menu::backdrop{background:rgba(0,0,0,.48)}
-.card-export-sheet{gap:8px;padding:10px}
-.card-export-heading{min-height:32px;padding:0}
-#card-export-cancel{top:-6px;right:-4px}
+#card-export-menu::backdrop{background:rgba(0,0,0,.30)}
+.card-export-sheet{position:relative;gap:8px;padding:10px;min-width:0}
 .card-export-sr-title{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

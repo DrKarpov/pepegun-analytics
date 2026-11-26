@@ -1,7 +1,7 @@
 // Isolated per-card PNG export. No analytics or network access.
 const labels={
- en:{hint:"Hold a card or right-click to export PNG",title:"Preview",download:"Download",share:"Share",cancel:"Close",preparing:"Preparing image…",failed:"Image could not be prepared. Try again.",shareFailed:"Sharing is unavailable. Download the PNG instead.",overview:"Overview",finite:"New and returning wallets",asOf:"Data as of",independent:"Independent on-chain analytics",stale:"Cached data",exportHint:"Export PNG"},
- ru:{hint:"Зажмите карточку или нажмите правой кнопкой для экспорта PNG",title:"Предпросмотр",download:"Скачать",share:"Поделиться",cancel:"Закрыть",preparing:"Подготовка изображения…",failed:"Не удалось подготовить изображение. Попробуйте ещё раз.",shareFailed:"Не удалось поделиться. Скачайте PNG.",overview:"Основные показатели",finite:"Новые и вернувшиеся кошельки",asOf:"Данные на",independent:"Независимая ончейн-аналитика",stale:"Сохранённые данные",exportHint:"Экспорт PNG"}
+ en:{hint:"Hold a card or right-click to export PNG",title:"Preview",download:"Download",share:"Share",preparing:"Preparing image…",failed:"Image could not be prepared. Try again.",shareFailed:"Sharing is unavailable. Download the PNG instead.",overview:"Overview",finite:"New and returning wallets",independent:"Independent on-chain analytics",stale:"Cached data",exportHint:"Export PNG"},
+ ru:{hint:"Зажмите карточку или нажмите правой кнопкой для экспорта PNG",title:"Предпросмотр",download:"Скачать",share:"Поделиться",preparing:"Подготовка изображения…",failed:"Не удалось подготовить изображение. Попробуйте ещё раз.",shareFailed:"Не удалось поделиться. Скачайте PNG.",overview:"Основные показатели",finite:"Новые и вернувшиеся кошельки",independent:"Независимая ончейн-аналитика",stale:"Сохранённые данные",exportHint:"Экспорт PNG"}
 };
 const palette={bg:"#101211",card:"#171a18",border:"#292e2b",text:"#edf1ee",muted:"#aab3ac",accent:"#b5ef58",primary:"#1a2018"};
 const text=(el,selector)=>el.querySelector(selector)?.textContent.trim()||"";
@@ -16,13 +16,11 @@ function capture(card,meta){
  const clone=svg.cloneNode(true),view=svg.viewBox.baseVal;clone.setAttribute("xmlns","http://www.w3.org/2000/svg");clone.setAttribute("font-family","system-ui, sans-serif");clone.removeAttribute("tabindex");clone.querySelectorAll(".cursor").forEach(el=>el.remove());clone.setAttribute("width",String(view.width));clone.setAttribute("height",String(view.height));
  return {...base,title:text(card,"h2"),subtitle:text(card,".chart-interval"),description:text(card,".sub"),readout:text(card,".chart-readout"),svg:new XMLSerializer().serializeToString(clone),ratio:view.height/view.width,legend:[...card.querySelectorAll(".chart-legend span")].map(s=>({label:s.textContent.trim(),color:s.querySelector("i")?.style.backgroundColor||palette.accent}))};
 }
-// Export-only timezone label: once, immediately after an actual clock time.
-export function cardTimeLabels(period,asOf,subtitle,readout){
+// Export-only UTC label: once, next to the clock time in the green period line.
+export function cardTimeLabels(period,subtitle,readout){
  const clean=value=>String(value||"").replace(/\s*·\s*UTC\b|\s*\(UTC\)|\s*\bUTC\b/g,"").replace(/\s{2,}/g," ").trim();
- const timed=/\b\d{1,2}:\d{2}\b/g;
- const add=value=>value.replace(/\b\d{1,2}:\d{2}\b(?![\s\S]*\b\d{1,2}:\d{2}\b)/,v=>v+" UTC");
- const result={period:clean(period),asOf:clean(asOf),subtitle:clean(subtitle),readout:clean(readout)};
- for(const key of ["period","asOf","readout"]){if([...result[key].matchAll(timed)].length){result[key]=add(result[key]);break}}
+ const result={period:clean(period),subtitle:clean(subtitle),readout:clean(readout)};
+ result.period=result.period.replace(/\b\d{1,2}:\d{2}\b(?![\s\S]*\b\d{1,2}:\d{2}\b)/,v=>v+" UTC");
  return result;
 }
 
@@ -43,9 +41,9 @@ export async function renderCardPng(s){
  }
  function round(x,y,w,h,fill){g.beginPath();if(g.roundRect)g.roundRect(x,y,w,h,14);else g.rect(x,y,w,h);g.fillStyle=fill;g.fill();g.strokeStyle=palette.border;g.lineWidth=1;g.stroke()}
  function fit(value,x,y,n,width,color,b=true){font(n,b);while(n>12&&g.measureText(value).width>width)font(--n,b);g.textAlign="center";g.textBaseline="top";g.fillStyle=color;g.fillText(value,x,y)}
- const dates=cardTimeLabels(s.meta.period,s.meta.asOf,s.subtitle,s.readout);
- const title=lines(s.title,cw-24,23,true),sub=lines(dates.subtitle,cw-24,15),desc=lines(s.description,cw-24,15),period=lines(dates.period,cw,15,true),stamp=lines(L.asOf+" "+dates.asOf+(s.meta.stale?" · "+L.stale:""),cw,12),read=lines(dates.readout,cw-28,15);
- const top=p+36+6+period.length*20+stamp.length*17+10;
+ const dates=cardTimeLabels(s.meta.period,s.subtitle,s.readout);
+ const title=lines(s.title,cw-24,23,true),sub=lines(dates.subtitle,cw-24,15),desc=lines(s.description,cw-24,15),period=lines(dates.period+(s.meta.stale?" · "+L.stale:""),cw,15,true),read=lines(dates.readout,cw-28,15);
+ const top=p+36+6+period.length*20+10;
  let tiles=[],rows=[],cols=0,tileW=0,cardH=0,plotH=0,legendRows=[];
  const contentTop=12+title.length*30+sub.length*20+desc.length*20;
  if(s.tiles){
@@ -62,7 +60,7 @@ export async function renderCardPng(s){
  const logo=await imageFrom(new URL("./pepegun-logo.svg",import.meta.url).href);
  const logoScale=Math.min(34/logo.naturalWidth,34/logo.naturalHeight);const lw=logo.naturalWidth*logoScale,lh=logo.naturalHeight*logoScale;font(24,true);const brandW=34+9+g.measureText("Pepegun Analytics").width,bx=(W-brandW)/2;g.drawImage(logo,bx+(34-lw)/2,p+(34-lh)/2,lw,lh);
  drawLines(["Pepegun Analytics"],bx+43,p+3,24,palette.text,true,"left");
- let y=p+42;y=drawLines(period,W/2,y,15,palette.accent,true,"center",20);drawLines(stamp,W/2,y,12,palette.muted,false,"center",17);
+ let y=p+42;y=drawLines(period,W/2,y,15,palette.accent,true,"center",20);
  round(p,top,cw,cardH,palette.card);y=top+12;y=drawLines(title,W/2,y,23,palette.text,true,"center",30);y=drawLines(sub,W/2,y,15,palette.muted,false,"center",20);y=drawLines(desc,W/2,y,15,palette.muted,false,"center",20);
  if(s.tiles){
   for(const r of rows){r.group.forEach((t,i)=>{const x=p+i*tileW,mid=x+tileW/2;
@@ -79,7 +77,7 @@ export async function renderCardPng(s){
  return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error("PNG unavailable")),"image/png"));
 }
 export function setupCardExport(getMeta,download){
- const dialog=document.getElementById("card-export-menu"),title=document.getElementById("card-export-title"),save=document.getElementById("card-export-download"),share=document.getElementById("card-export-share"),cancel=document.getElementById("card-export-cancel"),status=document.getElementById("card-export-status"),preview=document.getElementById("card-export-preview"),previewFrame=document.getElementById("card-export-preview-frame"),actions=document.getElementById("card-export-actions");
+ const dialog=document.getElementById("card-export-menu"),title=document.getElementById("card-export-title"),save=document.getElementById("card-export-download"),share=document.getElementById("card-export-share"),status=document.getElementById("card-export-status"),preview=document.getElementById("card-export-preview"),previewFrame=document.getElementById("card-export-preview-frame"),actions=document.getElementById("card-export-actions");
  const cards=[...document.querySelectorAll("[data-card-export]")];let press=null,feedbackTimer=0,timer=0,serial=0,ready=null,origin=null,previewUrl=null,closing=false,lastPointerType="";
  const FEEDBACK_DELAY=240,HOLD_DELAY=600,MOVE_LIMIT=8;
  const root=document.documentElement;
@@ -98,8 +96,8 @@ export function setupCardExport(getMeta,download){
  async function open(card,keyboard=false){
   clearHold();if(!keyboard)setInput("pointer");const meta=getMeta();if(!meta.valid||card.hidden||dialog.open||closing)return;const L=labels[meta.lang];let s;
   try{s=capture(card,meta)}catch{return}
-  origin=keyboard?card:null;const token=++serial;ready=null;clearPreview();title.textContent=L.title;save.textContent=L.download;share.textContent=L.share;cancel.setAttribute("aria-label",L.cancel);cancel.title=L.cancel;save.disabled=share.disabled=true;share.hidden=typeof navigator.share!=="function"||typeof navigator.canShare!=="function";actions.classList.toggle("single",share.hidden);status.textContent=L.preparing;
-  dialog.showModal();if(keyboard)cancel.focus({preventScroll:true});else{title.setAttribute("tabindex","-1");title.focus({preventScroll:true})}
+  origin=keyboard?card:null;const token=++serial;ready=null;clearPreview();title.textContent=L.title;save.textContent=L.download;share.textContent=L.share;save.disabled=share.disabled=true;share.hidden=typeof navigator.share!=="function"||typeof navigator.canShare!=="function";actions.classList.toggle("single",share.hidden);status.textContent=L.preparing;
+  dialog.showModal();title.setAttribute("tabindex","-1");title.focus({preventScroll:true});
   try{
    const blob=await renderCardPng(s);if(token!==serial||!dialog.open||closing)return;
    const name="pepegun-"+s.id+"-"+meta.anchor+".png";let file=null;try{file=new File([blob],name,{type:"image/png"})}catch{}
@@ -131,6 +129,6 @@ export function setupCardExport(getMeta,download){
  save.addEventListener("click",()=>{if(ready){download(ready.blob,ready.name);close()}});
  share.addEventListener("click",async()=>{if(!ready?.file)return;const s=ready;try{await navigator.share({files:[s.file]});close()}catch(e){if(e.name!=="AbortError"&&ready===s)status.textContent=s.L.shareFailed}});
  previewFrame.addEventListener("contextmenu",e=>e.preventDefault());previewFrame.addEventListener("dragstart",e=>e.preventDefault());
- cancel.addEventListener("click",close);dialog.addEventListener("cancel",e=>{e.preventDefault();close()});dialog.addEventListener("click",e=>{if(e.target===dialog)close()});dialog.addEventListener("close",()=>{clearHold();serial++;ready=null;clearPreview();dialog.classList.remove("export-closing");closing=false;if(origin&&root.dataset.inputMode==="keyboard")origin.focus({preventScroll:true});else{const focused=document.activeElement;if(focused instanceof HTMLElement||focused instanceof SVGElement){if(focused.closest("[data-card-export],#card-export-menu"))focused.blur?.()}}origin=null});
+ dialog.addEventListener("cancel",e=>{e.preventDefault();close()});dialog.addEventListener("click",e=>{if(e.target===dialog)close()});dialog.addEventListener("close",()=>{clearHold();serial++;ready=null;clearPreview();dialog.classList.remove("export-closing");closing=false;if(origin&&root.dataset.inputMode==="keyboard")origin.focus({preventScroll:true});else{const focused=document.activeElement;if(focused instanceof HTMLElement||focused instanceof SVGElement){if(focused.closest("[data-card-export],#card-export-menu"))focused.blur?.()}}origin=null});
  update();return update;
 }
