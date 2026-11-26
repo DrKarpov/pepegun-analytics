@@ -1,4 +1,4 @@
-import {setupCardExport} from "./card-export.mjs?v=24";
+import {setupCardExport} from "./card-export.mjs?v=25";
 import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,validAudit} from "./analytics.mjs?v=10";
 import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=10";
 const words={

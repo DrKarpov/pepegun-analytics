@@ -122,7 +122,7 @@ export function setupCardExport(getMeta,download){
  for(const event of ["pointerup","pointercancel","scroll","blur"])window.addEventListener(event,stop,{passive:true,capture:true});
  window.addEventListener("pointerdown",e=>{if(e.isPrimary===false)stop()},{passive:true});
  save.addEventListener("click",()=>{if(ready){download(ready.blob,ready.name);close()}});
- share.addEventListener("click",async()=>{if(!ready?.file)return;const s=ready;try{await navigator.share({files:[s.file],title:"Pepegun Analytics"});close()}catch(e){if(e.name!=="AbortError"&&ready===s)status.textContent=s.L.shareFailed}});
+ share.addEventListener("click",async()=>{if(!ready?.file)return;const s=ready;try{await navigator.share({files:[s.file]});close()}catch(e){if(e.name!=="AbortError"&&ready===s)status.textContent=s.L.shareFailed}});
  previewFrame.addEventListener("contextmenu",e=>e.preventDefault());previewFrame.addEventListener("dragstart",e=>e.preventDefault());
  cancel.addEventListener("click",close);dialog.addEventListener("cancel",e=>{e.preventDefault();close()});dialog.addEventListener("click",e=>{if(e.target===dialog)close()});dialog.addEventListener("close",()=>{clearHold();serial++;ready=null;clearPreview();dialog.classList.remove("export-closing");closing=false;if(origin&&root.dataset.inputMode==="keyboard")origin.focus({preventScroll:true});else{const focused=document.activeElement;if(focused instanceof HTMLElement||focused instanceof SVGElement){if(focused.closest("[data-card-export],#card-export-menu"))focused.blur?.()}}origin=null});
  update();return update;

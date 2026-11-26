@@ -54,3 +54,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v24 clean graph export and passive preview
 - Remove only .cursor from the cloned chart SVG before serializing it; the live chart, selected-point readout, axes, series and legend remain unchanged. Applies to all three individual chart exports and their previews. Replace the modal img with a passive canvas drawing the exact generated PNG; disable context menu and dragging on its wrapper. Download/share still use the original PNG blob. This addresses the native iOS image callout and unintended enlargement without disabling normal page scrolling or pinch zoom. Real iOS verification remains required.
+
+## v25 share without caption
+- Native sharing passes only the PNG file (no title, text or URL). Branding is already embedded in the image. Download behavior unchanged.
