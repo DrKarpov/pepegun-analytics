@@ -45,3 +45,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v21 per-card PNG export
 - Approved scope: overview (four metrics together), active wallets, new/returning wallets, growth, activity and fees charts. No venue/detail/transaction/method exports. Touch hold 600ms or desktop context menu; cancel on movement/scroll; chart plots and buttons excluded. Keyboard Enter/Shift+F10 available. One hint. Dialog with download and native file share when supported. Export uses frozen displayed values and existing SVG chart (including selected point), current period and data timestamp, original pepegun-logo.svg, independent branding and source URL. No third-party dependencies; original full dashboard exports unchanged. Real mobile browser and file-share behavior require verification.
+
+## v22 compact individual export
+- Approved: 600ms hold, 1.5% scale and green/teal animated outline only during hold, no pointer-focus ring, preserve keyboard focus. Compact methodology-colored preview dialog, close icon/backdrop/Escape, same PNG preview/download/share, reduced motion respected. Share hidden if native file sharing unavailable. Individual PNG: 16px outer padding, compact original logo and title, period and as-of line, no website/repo/footer; joined metric cells and active count before label. Full dashboard export and analytics unchanged.

@@ -342,15 +342,39 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 .footer-link.footer-bot:hover{background:linear-gradient(#26351e,#26351e) padding-box,linear-gradient(110deg,var(--accent),var(--secondary),var(--border),var(--accent),var(--secondary),var(--accent)) border-box;background-size:100% 100%,300% 100%}
 @media(prefers-reduced-motion:reduce){.footer-link.footer-bot{animation:none}}
 
-/* v21: optional card export; chart and transaction interaction stay unchanged. */
+
+/* v22: compact preview, animated hold feedback. */
 .card-export-hint{font-size:11px;color:var(--muted);text-align:center;margin:0 0 8px;line-height:1.4}
-[data-card-export]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+[data-card-export]{position:relative;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:transform .22s ease}
+[data-card-export]:focus:not(:focus-visible){outline:none}
 [data-card-export] .chart-tx{-webkit-touch-callout:default}
-#card-export-menu{box-sizing:border-box;width:min(420px,calc(100% - 32px));max-height:calc(100% - 32px);padding:0;border:1px solid var(--border);border-radius:var(--radius);background:var(--raised);color:var(--text);overflow:auto}
-#card-export-menu::backdrop{background:rgba(0,0,0,.65)}
-.card-export-sheet{display:grid;gap:10px;padding:18px;text-align:center}
-.card-export-sheet h2{font-size:16px;line-height:1.4}
+[data-card-export]::after{content:"";position:absolute;inset:0;z-index:2;border:1px solid var(--accent);border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .18s ease}
+[data-card-export].export-holding{transform:scale(1.015);z-index:3}
+[data-card-export].export-holding::after{opacity:1}
+@supports ((-webkit-mask-composite:xor) or (mask-composite:exclude)){
+ [data-card-export]::after{border:0;padding:2px;background:linear-gradient(110deg,var(--accent),var(--secondary),var(--border),var(--accent),var(--secondary),var(--accent));background-size:300% 100%;-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+ [data-card-export].export-holding::after{animation:card-hold-sweep .85s linear infinite}
+}
+@keyframes card-hold-sweep{from{background-position:0% 50%}to{background-position:100% 50%}}
+#card-export-menu{box-sizing:border-box;width:min(500px,calc(100% - 28px));max-height:calc(100% - 28px);max-height:calc(100dvh - 28px);margin:auto;padding:0;border:1px solid var(--border);border-radius:var(--radius);background:var(--raised);color:var(--text);overflow:auto;overscroll-behavior:contain}
+#card-export-menu[open]{animation:export-in .20s ease both}
+#card-export-menu::backdrop{background:rgba(0,0,0,.65);animation:export-fade .20s ease both}
+#card-export-menu.export-closing{animation:export-out .16s ease both}
+#card-export-menu.export-closing::backdrop{animation:export-fade .16s ease reverse both}
+@keyframes export-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes export-out{from{opacity:1;transform:scale(1)}to{opacity:0;transform:translateY(5px) scale(.98)}}
+@keyframes export-fade{from{opacity:0}to{opacity:1}}
+.card-export-sheet{display:grid;gap:8px;padding:12px;text-align:center}
+.card-export-heading{position:relative;display:grid;place-items:center;min-height:36px;padding-inline:40px}
+.card-export-heading h2{font-size:14px;font-weight:600;line-height:1.4}
+#card-export-cancel{position:absolute;right:-3px;top:-4px;display:grid;place-items:center;width:44px;height:44px;padding:0;background:transparent;border:0;color:var(--muted);border-radius:8px}
+#card-export-cancel svg{width:18px;height:18px}
+.card-export-sheet .sub{margin:0}
 .card-export-sheet .sub:empty{display:none}
-.card-export-sheet .outline{width:100%;min-height:44px}
-#card-export-download:not(:disabled){color:var(--accent);border-color:var(--accent);background:#1a2417}
-#card-export-cancel{border-color:transparent}
+#card-export-preview{display:block;max-width:100%;width:100%;height:auto;max-height:calc(100vh - 170px);max-height:calc(100dvh - 170px);object-fit:contain;border-radius:8px}
+.card-export-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.card-export-actions.single{grid-template-columns:minmax(0,1fr)}
+.card-export-actions .outline{width:100%;min-width:0;min-height:44px;border-radius:999px;border:1px solid var(--accent);background:#1a2417;color:var(--accent);padding-inline:6px;font-weight:600;white-space:normal}
+.card-export-actions .outline:hover:not(:disabled){background:#26351e;color:var(--accent)}
+.card-export-actions .outline:focus-visible{border-radius:999px}
+@media(prefers-reduced-motion:reduce){[data-card-export]{transition:none}[data-card-export].export-holding{transform:none}[data-card-export]::after{transition:none}#card-export-menu[open],#card-export-menu::backdrop{animation:none}}
