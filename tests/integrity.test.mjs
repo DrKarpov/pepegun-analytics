@@ -33,7 +33,7 @@ assert.equal(verify([mapTx({...genesisRaw,hash:hash(2),lt:"2"},"tonapi")],"1",ha
 assert.throws(()=>mapTx({account:RAW,hash:hash(1),lt:"1",now:101,description:{aborted:true}},"toncenter"));
 // Network fixtures: exercise sync without downloading live data.
 const apiTx=x=>({account:RAW,hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,now:x.t,description:{aborted:false}});
-const tonapiTx=x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true});
+const tonapiTx=x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true,...(x.m?{in_msg:{source:{address:x.m.s},value:x.m.v,bounced:x.m.b,decoded_op_name:"text_comment",decoded_body:{text:x.m.c}}}:{})});
 const originalFetch=globalThis.fetch;
 let requests=[];
 const install=handler=>{requests=[];globalThis.fetch=async input=>{const u=new URL(input);requests.push(u);return {ok:true,json:async()=>({transactions:handler(u).map(u.hostname==="tonapi.io"?tonapiTx:apiTx)})}}};
@@ -143,4 +143,98 @@ try{
  await assert.rejects(()=>crossCheck(c),/HTTP 403/);
  assert.equal(JSON.stringify(c),beforeAudit);
 }finally{globalThis.fetch=originalFetch}
-console.log("P1 integrity and P2 cancellation regression checks passed");
+// P2-03: checkpoint must be created by a full audit, bind every prefix row,
+// preserve ambiguous totals, and fall back when it cannot prove continuity.
+try{
+ install(()=>[...t].reverse());
+ const confirmed=await crossCheck(c);
+ assert.equal(confirmed.status,"match");
+ assert.equal(confirmed.method,"full");
+ assert.match(confirmed.proof.digest,/^[0-9a-f]{64}$/);
+ const checkpoint={...c,audit:confirmed};
+ install(u=>{assert.equal(u.searchParams.get("limit"),"1");return [t[2]]});
+ const same=await crossCheck(c,undefined,{checkpoint});
+ assert.equal(same.status,"match");assert.equal(same.method,"incremental");assert.equal(requests.length,1);
+ assert.equal(same.proof.fullAt,confirmed.proof.fullAt);
+ const tail={h:hash(4),lt:"4",prev:"3",prevHash:hash(3),t:104,success:true,m:null};
+ const extended=cacheFrom([tail],"toncenter",c);
+ install(u=>{assert.equal(u.searchParams.get("after_lt"),"3");return [tail]});
+ const extension=await crossCheck(extended,undefined,{checkpoint});
+ assert.equal(extension.status,"match");assert.equal(extension.method,"incremental");assert.equal(requests.length,1);
+ // Inclusive lower bound also works, even when successor prev hash is absent.
+ install(()=>[{...tail,prevHash:undefined},t[2]]);
+ assert.equal((await crossCheck(extended,undefined,{checkpoint})).method,"incremental");
+ // Alternate head ahead of unchanged published tip: independently link successor.
+ install(u=>u.searchParams.has("after_lt")?[tail]:[tail]);
+ assert.equal((await crossCheck(c,undefined,{checkpoint})).method,"incremental");
+ assert.equal(requests.length,2);
+ // Incomplete proof, old proof, corrupted digest, changed prefix, wrong source.
+ for(const invalid of [
+  {...checkpoint,audit:{...confirmed,proof:undefined}},
+  {...checkpoint,audit:{...confirmed,proof:{...confirmed.proof,fullAt:Date.now()-8*86400000}}},
+  {...checkpoint,audit:{...confirmed,proof:{...confirmed.proof,digest:hash(99)}}},
+  {...checkpoint,audit:{...confirmed,source:"toncenter"}},
+  {...checkpoint,ambiguous:1},
+  {...checkpoint,history:[checkpoint.history[0],["2",hash(9)],checkpoint.history[2]]}
+ ]){
+  install(u=>{assert.equal(u.searchParams.has("after_lt"),false);return [...t].reverse()});
+  const result=await crossCheck(c,undefined,{checkpoint:invalid});
+  assert.equal(result.method,"full");assert.equal(result.status,"match");assert.equal(requests.length,1);
+ }
+ // Missing successor linkage: fall back to a complete independent audit.
+ install(u=>u.searchParams.has("after_lt")?[{...tail,prevHash:undefined}]:[tail,...t.slice().reverse()]);
+ const fallback=await crossCheck(extended,undefined,{checkpoint});
+ assert.equal(fallback.method,"full");assert.equal(fallback.status,"match");assert.equal(requests.length,2);
+ // A known conflicting hash or predecessor must never produce match.
+ install(()=>[{...tail,h:hash(9)}]);
+ assert.equal((await crossCheck(extended,undefined,{checkpoint})).status,"mismatch");
+ install(()=>[{...tail,prevHash:hash(9)}]);
+ assert.equal((await crossCheck(extended,undefined,{checkpoint})).status,"mismatch");
+ // Provider returns a complete anchored tail with classification disagreement.
+ const different={...tail,m:{s:"0:"+hash(500),v:"100",b:false,c:"Pepegun fee · STON.fi"}};
+ const expected=cacheFrom([different],"toncenter",c);
+ install(()=>[tail]);
+ assert.equal((await crossCheck(expected,undefined,{checkpoint})).status,"mismatch");
+ // Positive classification and ambiguous-count preservation, including public
+ // packed snapshot round-trip. Proof must bind row values, not just tip hash.
+ const feeTx={...t[0],m:{s:"0:"+hash(500),v:"100",b:false,c:"Pepegun fee · STON.fi"}};
+ const ambiguousTx={...t[1],m:{s:"0:"+hash(501),v:"101",b:false,c:"Pepegun uncertain"}};
+ const labelled=[feeTx,ambiguousTx,t[2]],labelledCache=cacheFrom(labelled,"toncenter");
+ install(()=>labelled.slice().reverse());
+ const labelledProof=await crossCheck(labelledCache);
+ assert.equal(labelledProof.status,"match");assert.equal(labelledCache.ambiguous,1);
+ const packedCache=cacheFrom(labelled.map(x=>unpackTransaction(packTransaction(x))),"toncenter",null,labelledCache.asOf);
+ const packedCheckpoint={...packedCache,audit:labelledProof};
+ const freshFee={...tail,m:{s:"0:"+hash(502),v:"200",b:false,c:"Pepegun fee · DeDust"}};
+ const withFee=cacheFrom([freshFee],"toncenter",labelledCache);
+ install(()=>[freshFee]);
+ assert.equal((await crossCheck(withFee,undefined,{checkpoint:packedCheckpoint})).method,"incremental");
+ const freshAmbiguous={...tail,m:{s:"0:"+hash(502),v:"200",b:false,c:"Pepegun uncertain"}};
+ const withAmbiguous=cacheFrom([freshAmbiguous],"toncenter",labelledCache);
+ install(()=>[freshAmbiguous]);
+ assert.equal((await crossCheck(withAmbiguous,undefined,{checkpoint:packedCheckpoint})).method,"incremental");
+ assert.equal(withAmbiguous.ambiguous,2);
+ // A matching transaction hash alone cannot hide a changed classification
+ // of an anchor returned by the provider during the fast check.
+ const headTxs=[feeTx,t[1],{...t[2],m:freshFee.m}];
+ const checkedHead=cacheFrom(headTxs,"toncenter");
+ install(()=>headTxs.slice().reverse());
+ const headProof=await crossCheck(checkedHead);
+ const headCheckpoint={...checkedHead,audit:headProof};
+ install(u=>u.searchParams.get("limit")==="1"?[t[2]]:t.slice().reverse());
+ const wrongHead=await crossCheck(checkedHead,undefined,{checkpoint:headCheckpoint});
+ assert.equal(wrongHead.status,"mismatch");assert.equal(requests.length,2);
+ const corrupt={...packedCheckpoint,rows:packedCheckpoint.rows.map(r=>({...r,v:"999"}))};
+ install(()=>labelled.slice().reverse());
+ assert.equal((await crossCheck(labelledCache,undefined,{checkpoint:corrupt})).method,"full");
+ // Explicit/manual full check never takes the shortcut.
+ install(u=>{assert.equal(u.searchParams.has("after_lt"),false);return [...t].reverse()});
+ assert.equal((await crossCheck(checkpoint)).method,"full");
+ // A cancellation cannot silently switch to a full scan.
+ const ac=new AbortController();let calls=0;
+ globalThis.fetch=(...args)=>{calls++;return pendingFetch(...args)};
+ const work=crossCheck(extended,undefined,{checkpoint,signal:ac.signal});
+ setTimeout(()=>ac.abort(),10);
+ await assert.rejects(work,e=>e.name==="AbortError");assert.ok(calls<=1);
+}finally{globalThis.fetch=originalFetch}
+console.log("P1 integrity, P2 cancellation and checkpoint regression checks passed");

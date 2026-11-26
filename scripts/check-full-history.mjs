@@ -1,12 +1,14 @@
 // Read-only diagnostic against the published fixed history. No snapshot writes.
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
-import {download,mapTx,verify,compareLt,cacheFrom,unpackTransaction,compareSnapshots} from "../docs/analytics.mjs";
+import {crossCheck,mapTx,cacheFrom,unpackTransaction} from "../docs/analytics.mjs";
 const seed=JSON.parse(await readFile(new URL("../docs/snapshot.json",import.meta.url),"utf8"));
 const snapshot=cacheFrom(seed.transactions.map(unpackTransaction),seed.source,null,seed.asOf);
 const source=seed.source==="toncenter"?"tonapi":"toncenter";
 const original=globalThis.fetch;
+let requests=0;
 globalThis.fetch=async(url,options)=>{
+ requests++;
  const response=await original(url,options);
  const u=new URL(url);
  if(!response.ok){console.log("Provider HTTP",response.status,"cursor",u.searchParams.get("before_lt")??u.searchParams.get("end_lt"));return response}
@@ -20,18 +22,19 @@ globalThis.fetch=async(url,options)=>{
  return response;
 };
 try{
- const rows=await download(source,null,p=>{if(p.pages)console.log("Audit page",p.pages,p.scanned);else if(p.retry)console.log("Audit retry")},AbortSignal.timeout(240000));
- const upto=rows.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
- console.log("Provider history rows",rows.length,"common prefix",upto.length,"expected",snapshot.scanned,"first",upto[0]?.lt,"last",upto.at(-1)?.lt);
- for(let i=0;i<upto.length;i++){
-  const tx=upto[i],previous=upto[i-1],p=previous?.lt??"0",h=previous?.h??"0".repeat(64);
-  if(tx.prev!==p||(tx.prevHash!=null&&tx.prevHash!==h)){
-   console.error("First chain break",{index:i,lt:tx.lt,prev:tx.prev,expectedPrev:p,prevHash:tx.prevHash,expectedHash:h});break;
-  }
- }
- assert.ok(verify(upto,"0"),"Provider history continuity failed");
- assert.equal(upto.at(-1)?.lt,snapshot.tip,"Provider missing common tip");
- const other=cacheFrom(upto,source,null,snapshot.asOf);
- assert.ok(compareSnapshots(snapshot,other),"Complete transaction identities or classified rows disagree");
- console.log("Full live cross-check successful",source,other.scanned,other.rows.length);
+ const full=await crossCheck(snapshot,p=>{if(p.pages)console.log("Audit page",p.pages,p.scanned);else if(p.retry)console.log("Audit retry")});
+ assert.equal(full.status,"match","Complete transaction identities or classified rows disagree, or history unavailable");
+ assert.equal(full.method,"full");
+ assert.equal(full.scanned,snapshot.scanned);
+ assert.equal(full.rows,snapshot.rows.length);
+ assert.match(full.proof.digest,/^[0-9a-f]{64}$/);
+ const fullRequests=requests;
+ console.log("Full live cross-check successful",source,full.scanned,full.rows,"requests",fullRequests);
+ requests=0;
+ const fast=await crossCheck(snapshot,p=>{if(p.pages)console.log("Checkpoint page",p.pages,p.scanned)},{checkpoint:{...snapshot,audit:full}});
+ assert.equal(fast.status,"match");
+ assert.equal(fast.method,"incremental","Verified checkpoint must be reusable against the live API");
+ assert.equal(fast.proof.digest,full.proof.digest);
+ assert.equal(fast.proof.fullAt,full.proof.fullAt);
+ console.log("Incremental live cross-check successful",source,fast.scanned,fast.rows,"requests",requests,"vs full",fullRequests);
 }finally{globalThis.fetch=original}

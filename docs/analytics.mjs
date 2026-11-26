@@ -271,7 +271,78 @@ export function compareSnapshots(snapshot,other){
  const byHash=new Map(other.rows.map(r=>[r.h,r]));
  return sameHistory(snapshot.history,other.history)&&snapshot.tip===other.tip&&snapshot.tipHash===other.tipHash&&snapshot.scanned===other.scanned&&snapshot.ambiguous===other.ambiguous&&snapshot.rows.length===other.rows.length&&!snapshot.rows.some(r=>{const a=byHash.get(r.h);return !a||["lt","t","s","v","k","d"].some(k=>r[k]!==a[k])});
 }
-export async function crossCheck(snapshot,progress,{signal,timeoutMs=AUDIT_TIMEOUT}={}){
+// P2-03: bind the complete previously reconciled prefix (including classified
+// rows and ambiguity totals) to a digest. An old match without proof still
+// renders normally but is never sufficient for incremental auditing.
+const FULL_AUDIT_MAX_AGE=7*DAY;
+const canonicalRows=rows=>rows.slice().sort((a,b)=>compareLt(a.lt,b.lt)).map(r=>[r.h,r.lt,r.t,r.s,r.v,r.k,r.d]);
+async function checkpointDigest(c,fullAt,source){
+ try{
+  const bytes=new TextEncoder().encode(JSON.stringify(["pepegun-audit-proof-v1",fullAt,source,c.version,c.address,c.tip,c.tipHash,c.firstTime,c.tipTime,c.scanned,c.ambiguous,c.history,canonicalRows(c.rows)]));
+  const digest=await globalThis.crypto.subtle.digest("SHA-256",bytes);
+  return Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,"0")).join("");
+ }catch{return null}
+}
+async function matchedAudit(snapshot,source,fullAt,method,scanned,rows,signal){
+ const digest=await checkpointDigest(snapshot,fullAt,source);
+ checkAbort(signal);
+ return auditResult(snapshot,"match",{source,scanned,rows,method,...(digest?{proof:{version:1,digest,fullAt}}:{})});
+}
+async function incrementalAudit(snapshot,checkpoint,source,progress,signal){
+ if(!validCache(checkpoint)||auditTrust(checkpoint)!=="match"||checkpoint.audit.source!==source)return null;
+ const proof=checkpoint.audit.proof;
+ if(proof?.version!==1||typeof proof.digest!=="string"||!hashPattern.test(proof.digest)||!Number.isFinite(proof.fullAt)||proof.fullAt<=0||proof.fullAt>checkpoint.audit.asOf||Date.now()-proof.fullAt>=FULL_AUDIT_MAX_AGE)return null;
+ if(compareLt(checkpoint.tip,snapshot.tip)>0||checkpoint.firstTime!==snapshot.firstTime||checkpoint.ambiguous>snapshot.ambiguous)return null;
+ if(!sameHistory(checkpoint.history,snapshot.history.slice(0,checkpoint.scanned)))return null;
+ if(JSON.stringify(canonicalRows(checkpoint.rows))!==JSON.stringify(canonicalRows(snapshot.rows.filter(r=>compareLt(r.lt,checkpoint.tip)<=0))))return null;
+ if(await checkpointDigest(checkpoint,proof.fullAt,source)!==proof.digest)return null;
+ checkAbort(signal);
+ const match=()=>matchedAudit(snapshot,source,proof.fullAt,"incremental",snapshot.scanned,snapshot.rows.length,signal);
+ const mismatch=()=>auditResult(snapshot,"mismatch",{source});
+ // Also examine any already-confirmed rows the provider actually returns.
+ // A new decoded classification disagreement must not be ignored just
+ // because the transaction identity was verified in an older full audit.
+ const prefixRows=new Map(checkpoint.rows.map(r=>[r.lt,r]));
+ const changedPrefixRow=txs=>txs.some(tx=>{
+  if(compareLt(tx.lt,checkpoint.tip)>0)return false;
+  const row=prefixRows.get(tx.lt),observed=classify(tx);
+  // The cache only stores the total ambiguous count, not its per-LT membership.
+  // When a returned unclassified prefix row could affect that count, recheck all.
+  if(!row&&!observed&&(checkpoint.ambiguous>0||minimizeTransaction(tx).a===true))return true;
+  return JSON.stringify(row?canonicalRows([row])[0]:null)!==JSON.stringify(observed?canonicalRows([observed])[0]:null);
+ });
+ // For an unchanged tip, independently verify the alternate indexer's head.
+ if(checkpoint.tip===snapshot.tip){
+  if(!compareSnapshots(checkpoint,snapshot)||checkpoint.tipTime!==snapshot.tipTime)return null;
+  const head=await getPage(source,null,null,1,progress,signal);
+  progress?.({source,pages:1,scanned:head.length});
+  if(overlapConflict(snapshot,head))return mismatch();
+  if(changedPrefixRow(head))return null;
+  if(head.length===1&&head[0].lt===checkpoint.tip&&head[0].h===checkpoint.tipHash)return match();
+  if(!head.length||compareLt(head[0].lt,checkpoint.tip)<0)return null;
+ }
+ // Providers differ on inclusive/exclusive lower bounds. Require a matching
+ // explicit anchor or the first successor's previous hash, not just its LT.
+ const txs=await download(source,checkpoint.tip,progress,signal);
+ const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
+ if(overlapConflict(snapshot,upto))return mismatch();
+ if(changedPrefixRow(upto))return null;
+ const knownPrefix=new Set(checkpoint.history.map(row=>row[0]));
+ if(upto.some(t=>compareLt(t.lt,checkpoint.tip)<=0&&!knownPrefix.has(t.lt)))return null;
+ const anchor=txs.find(t=>t.lt===checkpoint.tip);
+ const newer=txs.filter(t=>compareLt(t.lt,checkpoint.tip)>0);
+ const fresh=newer.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
+ const first=newer[0];
+ if(!anchor&&(!first||first.prev!==checkpoint.tip||first.prevHash!==checkpoint.tipHash))return null;
+ if(snapshot.tip===checkpoint.tip){
+  if(first&&!verify([first],checkpoint.tip,checkpoint.tipHash))return null;
+  return match();
+ }
+ if(!verify(fresh,checkpoint.tip,checkpoint.tipHash)||fresh.at(-1)?.lt!==snapshot.tip)return null;
+ const other=cacheFrom(fresh,source,checkpoint,snapshot.asOf);
+ return compareSnapshots(snapshot,other)?match():mismatch();
+}
+export async function crossCheck(snapshot,progress,{signal,timeoutMs=AUDIT_TIMEOUT,checkpoint=null}={}){
  checkAbort(signal);
  if(!validCache(snapshot))throw Error("No verified snapshot");
  if(!Number.isFinite(timeoutMs)||timeoutMs<=0)throw Error("Invalid audit timeout");
@@ -281,13 +352,14 @@ export async function crossCheck(snapshot,progress,{signal,timeoutMs=AUDIT_TIMEO
  signal?.addEventListener("abort",forward,{once:true});
  const timer=setTimeout(()=>controller.abort(new DOMException("Audit timed out","TimeoutError")),timeoutMs);
  try{
+  if(checkpoint){const result=await incrementalAudit(snapshot,checkpoint,source,progress,controller.signal);if(result)return result}
   const txs=await download(source,null,progress,controller.signal);
   checkAbort(controller.signal);
   const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
   if(overlapConflict(snapshot,upto))return auditResult(snapshot,"mismatch",{source});
   if(!verify(upto,"0")||upto.at(-1)?.lt!==snapshot.tip)return auditResult(snapshot,"unavailable",{source});
   const other=cacheFrom(upto,source,null,snapshot.asOf);
-  return auditResult(snapshot,compareSnapshots(snapshot,other)?"match":"mismatch",{source,scanned:other.scanned,rows:other.rows.length});
+  return compareSnapshots(snapshot,other)?await matchedAudit(snapshot,source,Date.now(),"full",other.scanned,other.rows.length,controller.signal):auditResult(snapshot,"mismatch",{source,scanned:other.scanned,rows:other.rows.length});
  }finally{clearTimeout(timer);signal?.removeEventListener("abort",forward)}
 }
 export function exact(n){const q=BigInt(n),s=q<0n?"-":"",v=q<0n?-q:q;return s+(v/1000000000n)+"."+(v%1000000000n).toString().padStart(9,"0")}
