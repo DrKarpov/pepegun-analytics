@@ -1,4 +1,4 @@
-import {lang,tr,num,pct,money,esc,time,txTime,utcDate,syncTime,shortDate,clock,intervalName,toggleLanguage} from "./i18n.mjs?v=39";
+import {lang,tr,locale,num,pct,money,esc,time,txTime,utcDate,syncTime,shortDate,clock,intervalName,toggleLanguage} from "./i18n.mjs?v=39";
 import {createCharts} from "./charts.mjs?v=39";
 import {renderDashboardPng} from "./dashboard-export.mjs?v=39";
 import {setupCardExport} from "./card-export.mjs?v=38";
