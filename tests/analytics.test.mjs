@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {RAW,DAY,verify,ordered,classify,cacheFrom,metrics,resolveRange,exact,csv,mapTx} from "../docs/analytics.mjs";
+const sender="0:"+"a".repeat(64),b="0:"+"b".repeat(64),base=Date.UTC(2026,9,15),tx=(i,t,s,c,v)=>({h:String(i).padStart(64,"0"),lt:String(i),prev:String(i-1),t:t/1000,success:true,m:{s,c,v,b:false}});
+const t=[tx(1,base,sender,"Pepegun fee · STON.fi","100000000"),tx(2,base+1000,sender,"Pepegun fee · STON.fi","200000000"),tx(3,base+DAY,b,"Pepegun · DeDust","11867000000"),tx(4,base+DAY+1000,RAW,"Pepegun fee","900000000"),tx(5,base+2*DAY,sender,"Pepegun fee · STON.fi","1"),tx(6,base+2*DAY+1000,b,"Pepegun fee · DeDust","10000000")];
+assert.equal(verify(t,"0"),true);assert.equal(verify([],"0"),false);assert.equal(verify([t[0],t[2]],"0"),false);assert.equal(ordered([...t,t[0]]).length,6);assert.equal(classify(t[3]),null);
+assert.equal(classify({...t[0],success:false}),null);assert.equal(classify({...t[0],m:{...t[0].m,b:true}}),null);
+const c=cacheFrom(t,"toncenter",null,base+3*DAY);const now=base+3*DAY-1;const all=metrics(c.rows,resolveRange("all",now,base),now);
+assert.equal(all.wallets,2);assert.equal(all.paying,2);assert.equal(all.count,4);assert.equal(all.other,1);assert.equal(all.fee,310000001n);assert.equal(all.otherValue,11867000000n);assert.equal(all.newWallets,2);assert.equal(all.returning,0);assert.equal(all.daily[1].new,1);assert.equal(all.daily[2].returning,2);assert.equal(all.daily[2].cum,2);assert.equal(all.daily[2].cumPay,2);assert.equal(all.activity.wau,2);assert.equal(all.daily.reduce((s,d)=>s+d.fee,0n),all.fee);
+const last=metrics(c.rows,resolveRange("24h",now,base),now);assert.equal(last.wallets,2);assert.equal(last.newWallets,0);assert.equal(last.returning,2);assert.equal(last.fee,10000001n);
+assert.equal(resolveRange("custom",now,base,{from:"2026-10-15",to:"2026-11-01"}),null);assert.equal(resolveRange("custom",now,base,{from:"2026-10-16",to:"2026-10-15"}),null);assert.equal(exact(all.fee),"0.310000001");assert.ok(csv(all).includes("0.310000001")===false);assert.ok(csv(all).includes("0.300000000"));
+assert.throws(()=>mapTx({account:"0:"+"f".repeat(64)},"toncenter"));
+console.log("Pepegun analytics regression checks passed");
