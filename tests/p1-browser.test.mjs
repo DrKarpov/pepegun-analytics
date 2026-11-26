@@ -73,14 +73,14 @@ async function inspectCardPng(page,id,{download=true,pixels=false}={}){
  }
  assert.equal(await page.locator("#card-export-download").isEnabled(),true,label+" PNG preparation failed: "+await page.locator("#card-export-status").textContent());
  const entries=await page.evaluate(()=>window.__cardText);
- const preview=pixels?await page.locator("#card-export-preview").evaluate(e=>e.toDataURL()):null;
+ const preview=pixels?await page.locator("#card-export-preview").evaluate(e=>e.toDataURL().split(",")[1]):null;
  if(download){
   const png=await readDownload(page,"#card-export-download");
   assert.equal(png.subarray(1,4).toString(),"PNG");
   if(pixels){
    const result=await page.evaluate(async({preview,png})=>{
-    const decode=async src=>{const img=new Image();img.src=src;await img.decode();const c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;const ctx=c.getContext("2d");ctx.drawImage(img,0,0);return {width:c.width,height:c.height,data:ctx.getImageData(0,0,c.width,c.height).data}};
-    const a=await decode(preview),b=await decode("data:image/png;base64,"+png);
+    const decode=async base64=>{const src=URL.createObjectURL(new Blob([Uint8Array.from(atob(base64),c=>c.charCodeAt(0))],{type:"image/png"}));try{const img=new Image();img.src=src;await img.decode();const c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;const ctx=c.getContext("2d");ctx.drawImage(img,0,0);return {width:c.width,height:c.height,data:ctx.getImageData(0,0,c.width,c.height).data}}finally{URL.revokeObjectURL(src)}};
+    const a=await decode(preview),b=await decode(png);
     return a.width===b.width&&a.height===b.height&&a.data.every((v,i)=>v===b.data[i]);
    },{preview,png:png.toString("base64")});
    assert.equal(result,true,id+" preview and downloaded PNG pixels differ");
@@ -90,11 +90,23 @@ async function inspectCardPng(page,id,{download=true,pixels=false}={}){
  return entries;
 }
 
+// CSP is the real meta policy delivered by index.html, not a test-only header.
+async function watchCsp(context){
+ await context.addInitScript(()=>{
+  window.__cspViolations=[];
+  document.addEventListener("securitypolicyviolation",e=>window.__cspViolations.push({directive:e.effectiveDirective,blocked:e.blockedURI,disposition:e.disposition}));
+ });
+}
+async function assertNoCsp(page,label){
+ assert.deepEqual(await page.evaluate(()=>window.__cspViolations),[],label+" unexpected CSP violation");
+}
+
 try{
  for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
   const browser=await engine.launch({headless:true});
   try{
    const ctx=await browser.newContext({viewport:{width:1440,height:900},locale:"en-US",acceptDownloads:true});
+   await watchCsp(ctx);
    let mode="match",seed=snapshot;
    await ctx.addInitScript(()=>{
     localStorage.setItem("pepegun-lang","en");
@@ -187,6 +199,7 @@ try{
    assert.equal(await page.locator("#notice").isVisible(),false);
    // Fresh independent context for the migration/unavailable scenario.
    const migration=await browser.newContext({viewport:{width:393,height:852},locale:"ru-RU",hasTouch:true});
+   await watchCsp(migration);
    await migration.addInitScript(()=>localStorage.setItem("pepegun-lang","ru"));
    let legacySeed={...snapshot,audit:{status:"match",tip:cache.tip,asOf:now}};
    await migration.route("https://raw.githubusercontent.com/**/snapshot.json*",route=>route.fulfill({json:legacySeed}));
@@ -324,10 +337,12 @@ try{
    await legacyPage.waitForFunction(()=>!document.querySelector("#card-export-download").disabled);
    await legacyPage.keyboard.press("Escape");
    await legacyPage.locator("#card-export-menu").waitFor({state:"hidden"});
+   await assertNoCsp(legacyPage,name+" migration");
    await migration.close();
    // P2-05: a wallet active on consecutive days produces returning bars
    // in a complete interval and the incomplete current UTC bucket.
    const contrastCtx=await browser.newContext({viewport:{width:393,height:852},locale:"en-US",acceptDownloads:true});
+   await watchCsp(contrastCtx);
    // Fix the browser clock within a 3-hour bucket. The midnight transaction
    // in the original fixture was in a COMPLETE bucket by the evening run.
    const day=Math.floor(now/86400000)*86400,contrastNow=(day+13*3600)*1000;
@@ -360,9 +375,11 @@ try{
     let canvas;
     if(preview)canvas=document.querySelector("#card-export-preview");
     else{
-     const img=new Image();img.src="data:image/png;base64,"+base64;await img.decode();
-     canvas=document.createElement("canvas");canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
-     canvas.getContext("2d").drawImage(img,0,0);
+     const src=URL.createObjectURL(new Blob([Uint8Array.from(atob(base64),c=>c.charCodeAt(0))],{type:"image/png"}));
+     try{const img=new Image();img.src=src;await img.decode();
+      canvas=document.createElement("canvas");canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+      canvas.getContext("2d").drawImage(img,0,0);
+     }finally{URL.revokeObjectURL(src)}
     }
     const pixels=canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data;
     let full=0,partial=0;
@@ -422,9 +439,67 @@ try{
      }
     }
    }
+   await assertNoCsp(contrastPage,name+" contrastCtx");
    await contrastCtx.close();
+   // P2-07: prove both allowed fallback routes and denied resource classes.
+   // Use a new context so deliberate violations cannot mask legitimate ones.
+   const policyCtx=await browser.newContext({viewport:{width:393,height:852},acceptDownloads:true});
+   await watchCsp(policyCtx);
+   let rawAttempts=0,localAttempts=0,primaryAttempts=0,alternateAttempts=0,blockedRequests=0;
+   await policyCtx.route("https://raw.githubusercontent.com/**/snapshot.json*",route=>{rawAttempts++;return deny(route)});
+   await policyCtx.route(url+"/snapshot.json*",route=>{localAttempts++;return route.fulfill({json:snapshot})});
+   await policyCtx.route("https://toncenter.com/**",route=>{primaryAttempts++;return deny(route)});
+   await policyCtx.route("https://tonapi.io/**",route=>{alternateAttempts++;return ok(route,txs.slice().reverse().map(ta))});
+   await policyCtx.route("https://blocked.invalid/**",route=>{blockedRequests++;return route.fulfill({status:200,contentType:"application/javascript",headers:{"access-control-allow-origin":"*"},body:"window.__externalExecuted=true"})});
+   const policyPage=await policyCtx.newPage();
+   await policyPage.goto(url);
+   await policyPage.locator("#startup-screen").waitFor({state:"detached"});
+   await policyPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
+   assert.ok(rawAttempts>0&&localAttempts>0&&primaryAttempts>0&&alternateAttempts>0,name+" allowed snapshot/provider fallback not exercised");
+   assert.equal(await policyPage.locator("#overview .kpi-value").first().innerText(),"3");
+   // Existing inline style attributes are necessary for chart legends and
+   // venue bars; test computed presentation, not just the HTML attributes.
+   const styled=await policyPage.evaluate(()=>{
+    const swatch=document.querySelector("#daily-chart .swatch"),bar=document.querySelector(".venue-bar b");
+    return {swatch:getComputedStyle(swatch).backgroundColor,bar:bar.getBoundingClientRect().width,parent:bar.parentElement.getBoundingClientRect().width,links:[...document.querySelectorAll(".footer-links a")].map(a=>({href:a.href,rel:a.rel}))};
+   });
+   assert.equal(styled.swatch,"rgb(168, 217, 86)");
+   assert.ok(styled.parent>0&&Math.abs(styled.bar-styled.parent)<=1,name+" venue bar lost dynamic style");
+   assert.ok(styled.links.some(l=>l.href.startsWith("https://tonviewer.com/")&&l.rel.includes("noopener")));
+   assert.ok(styled.links.some(l=>l.href.startsWith("https://t.me/")&&l.rel.includes("noopener")));
+   await policyPage.locator('[data-range="7d"]').click();
+   await inspectCardPng(policyPage,"activity",{pixels:true});
+   assert.equal((await readDownload(policyPage,"#png")).subarray(1,4).toString(),"PNG");
+   assert.match((await readDownload(policyPage,"#csv")).toString("utf8"),/audit_status/);
+   await assertNoCsp(policyPage,name+" allowed fallback and exports");
+   // Inject ordinary DOM resources (not Playwright addScriptTag/evaluate
+   // execution itself). Native CSP must stop them before the network.
+   const probe=await policyPage.evaluate(async()=>{
+    window.__inlineExecuted=false;window.__externalExecuted=false;
+    const inline=document.createElement("script");inline.textContent="window.__inlineExecuted=true";document.head.append(inline);
+    const external=document.createElement("script");external.src="https://blocked.invalid/injected.js";document.head.append(external);
+    const image=new Image();image.src="https://blocked.invalid/image.png";document.body.append(image);
+    const dataImage=new Image();dataImage.src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E";document.body.append(dataImage);
+    const base=document.createElement("base");base.href="https://blocked.invalid/";document.head.append(base);
+    const style=document.createElement("style");style.textContent="html { --csp-injected: yes; }";document.head.append(style);
+    let denied=false;try{await fetch("https://blocked.invalid/collect")}catch{denied=true}
+    return {denied,inline:window.__inlineExecuted,base:document.baseURI,style:getComputedStyle(document.documentElement).getPropertyValue("--csp-injected").trim()};
+   });
+   assert.equal(probe.denied,true);assert.equal(probe.inline,false);assert.equal(probe.style,"");assert.ok(probe.base.startsWith(url));
+   await policyPage.waitForFunction(()=>["script-src","connect-src","img-src","base-uri","style-src"].every(prefix=>window.__cspViolations.some(v=>v.directive.startsWith(prefix)&&v.disposition==="enforce")));
+   const violations=await policyPage.evaluate(()=>window.__cspViolations);
+   assert.ok(violations.some(v=>v.directive.startsWith("script-src")&&v.blocked==="inline"));
+   assert.ok(violations.some(v=>v.directive.startsWith("script-src")&&v.blocked.startsWith("https://blocked.invalid")));
+   assert.ok(violations.some(v=>v.directive==="connect-src"&&v.blocked.startsWith("https://blocked.invalid")));
+   assert.ok(violations.some(v=>v.directive==="img-src"&&v.blocked.startsWith("https://blocked.invalid")));
+   assert.ok(violations.some(v=>v.directive==="img-src"&&v.blocked.startsWith("data")));
+   assert.equal(await policyPage.evaluate(()=>window.__externalExecuted),false);
+   assert.equal(blockedRequests,0,name+" prohibited network request reached route");
+   await policyCtx.close();
+   console.log(name,"CSP enforced; allowed API/snapshot fallback, inline attributes and exports verified");
    // Failure and reduced-motion: normal application error must remain usable.
    const offline=await browser.newContext({viewport:{width:393,height:852},reducedMotion:"reduce"});
+   await watchCsp(offline);
    await offline.route("**/snapshot.json*",deny);
    await offline.route("https://toncenter.com/**",deny);
    await offline.route("https://tonapi.io/**",deny);
@@ -435,15 +510,18 @@ try{
    await offlinePage.locator("#startup-screen").waitFor({state:"detached",timeout:10000});
    await offlinePage.waitForFunction(()=>!document.querySelector("#refresh").disabled);
    assert.equal(await offlinePage.locator(".page").evaluate(e=>getComputedStyle(e).visibility),"visible");
+   await assertNoCsp(offlinePage,name+" offline");
    await offline.close();
    // Even if the app module itself fails, the presentation must fail open.
    const broken=await browser.newContext({viewport:{width:393,height:852},reducedMotion:"reduce"});
+   await watchCsp(broken);
    await broken.route("**/app.mjs?*",route=>route.abort());
    const brokenPage=await broken.newPage();
    await brokenPage.goto(url,{waitUntil:"domcontentloaded"});
    await brokenPage.locator("#startup-screen").waitFor({state:"visible"});
    await brokenPage.locator("#startup-screen").waitFor({state:"detached",timeout:12000});
    assert.equal(await brokenPage.locator(".page").evaluate(e=>getComputedStyle(e).visibility),"visible");
+   await assertNoCsp(brokenPage,name+" broken");
    await broken.close();
    const nojs=await browser.newContext({javaScriptEnabled:false});
    const nojsPage=await nojs.newPage();await nojsPage.goto(url);
@@ -451,6 +529,7 @@ try{
    assert.equal(await nojsPage.locator(".page").isVisible(),true);
    await nojs.close();
    assert.deepEqual(errors,[]);
+   await assertNoCsp(page,name+" ctx");
    await ctx.close();
    console.log(name,"Trust states, bilingual viewports, CSV/PNG, audit cancellation, startup screen, chart gestures, returning contrast and all card export labels verified");
   }finally{await browser.close()}
