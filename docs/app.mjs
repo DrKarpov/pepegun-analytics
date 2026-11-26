@@ -115,6 +115,9 @@ const words={
     "auditButton": "Compare both indexers",
     "auditIdle": "Not independently checked for this snapshot",
     "auditBusy": "Checking alternate indexer…",
+    "auditPages": "Pages downloaded",
+    "auditScanned": "Transactions scanned",
+    "auditRetry": "Retrying request…",
     "auditMatch": "Both sources match for the checked snapshot",
     "auditMismatch": "Sources disagree — review required",
     "auditUnavailable": "Alternate indexer could not verify this snapshot",
@@ -265,6 +268,9 @@ const words={
     "auditButton": "Сверить оба индексатора",
     "auditIdle": "Этот снимок ещё не сверялся",
     "auditBusy": "Проверка второго индексатора…",
+    "auditPages": "Загружено страниц",
+    "auditScanned": "Просмотрено транзакций",
+    "auditRetry": "Повторный запрос…",
     "auditMatch": "Источники совпадают на проверенном снимке",
     "auditMismatch": "Источники расходятся — нужна проверка",
     "auditUnavailable": "Второй индексатор не подтвердил снимок",
@@ -320,7 +326,7 @@ function intervalLabel(b){const a=b.start,z=b.end-1;if(hourly())return utcDate(a
 function exportDateLabel(){return range?(selected==="6h"||selected==="24h"?time(range.from)+" — "+time(range.to-1):dateLabel()+" · UTC"):""}
 const statusLabel=s=>s==="partial"?tr("partial"):s==="incomplete"?tr("incomplete"):tr("complete");
 let cache=null,selected="all",m=null,range=null,busy=true,error=false,storageError=false,exportError=false,progress=null,resizeTimer;
-let pointsState={},pointBuckets={},audit=null,auditing=false,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
+let pointsState={},pointBuckets={},audit=null,auditing=false,auditProgress=null,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
 function stale(){return !!cache&&(error||Date.now()-cache.asOf>STALE)}
 function language(){document.documentElement.lang=lang;document.querySelectorAll("[data-i]").forEach(el=>el.textContent=tr(el.dataset.i));const switchLabel=lang==="ru"?"Switch to English":"Переключить на русский";$("language").textContent=lang==="ru"?"EN":"RU";$("language").setAttribute("aria-label",switchLabel);$("language").title=switchLabel;$("refresh").setAttribute("aria-label",tr("refresh"));$("refresh").title=tr("refresh");$("filters").setAttribute("aria-label",tr("range"));$("tx-filters").setAttribute("aria-label",lang==="ru"?"Тип транзакции":"Transaction type");$("overview").setAttribute("aria-label",tr("overview"));$("active").setAttribute("aria-label",tr("active"));}
 function updateStatus(){
@@ -446,17 +452,20 @@ function renderDetails(){
  const rows=[...series.bins].reverse();$("history").innerHTML=rows.length?table([tr("interval"),tr("activeShort"),tr("newShort"),tr("returningShort"),tr("payingShort"),tr("newPayShort"),tr("count"),tr("fee")+" (GRAM)"],rows.slice(0,historyLimit).map(d=>[esc(intervalLabel(d))+(d.status==="complete"?"":'<div class="date-status">'+esc(statusLabel(d.status))+'</div>'),...[d.active,d.new,d.returning,d.paying,d.newPay,d.count].map(x=>esc(num(x))),esc(money(d.fee))])):placeholder();
  $("more").hidden=rows.length<=14;$("more").textContent=tr(historyLimit>=rows.length?"less":"more");
  }
- renderExtras();const items=[...tr("methodItems"),tr("shortRules")];$("method").innerHTML='<ul class="method-list">'+items.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><div class="method-facts">'+esc(tr("collector"))+': <a href="https://tonviewer.com/'+ADDRESS+'" target="_blank" rel="noopener noreferrer">'+ADDRESS+'</a>'+(cache?'<br>'+esc(tr("provider")+": "+(cache.source==="toncenter"?"Toncenter API v3":"TonAPI v2"))+'<br>'+esc(tr("scanned")+": "+num(cache.scanned))+'<br>'+esc(tr("coverage")+": "+tr("verified")):'')+'</div>';
+ renderExtras();const items=[...tr("methodItems"),tr("shortRules")];$("method").innerHTML='<ul class="method-list">'+items.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><div class="method-facts">'+esc(tr("collector"))+':<span class="collector-address">'+ADDRESS+'</span>'+(cache?'<br>'+esc(tr("provider")+": "+(cache.source==="toncenter"?"Toncenter API v3":"TonAPI v2"))+'<br>'+esc(tr("scanned")+": "+num(cache.scanned))+'<br>'+esc(tr("coverage")+": "+tr("verified")):'')+'</div>';
 }
 function renderExtras(){
  const check=(!audit||cache?.audit?.asOf>audit.asOf)?cache?.audit:audit;
  const state=auditing?"auditBusy":check?({match:"auditMatch",mismatch:"auditMismatch",unavailable:"auditUnavailable"}[check.status]||"auditIdle"):"auditIdle";
  $("audit-result").textContent=tr(state)+(check&&!auditing?" · "+time(check.asOf)+(cache&&check.tip!==cache.tip?" · "+tr("auditPrior"):""):"");
  $("audit-result").className="sub "+(state==="auditMismatch"?"audit-warn":"");
- $("audit-check").disabled=!cache||auditing;$("audit-check").textContent=tr("auditButton");
+ const auditButton=$("audit-check");auditButton.disabled=!cache||auditing;auditButton.classList.toggle("audit-running",auditing);auditButton.setAttribute("aria-busy",String(auditing));auditButton.textContent=tr(auditing?"auditBusy":"auditButton");
+ const p=auditProgress;
+ $("audit-progress").hidden=!auditing;
+ $("audit-progress").textContent=auditing&&p?((p.source==="tonapi"?"TonAPI v2":"Toncenter API v3")+" · "+tr("auditPages")+": "+num(p.pages)+" · "+tr("auditScanned")+": "+num(p.scanned)+(p.retry?" · "+tr("auditRetry"):"")):"";
  $("audit-meta").textContent=cache?tr("ambiguous")+": "+num(cache.ambiguous)+" · "+tr("chainTip")+": "+time(cache.tipTime*1000):"";
 }
-async function auditSources(){if(!cache||auditing)return;const snapshot=cache;auditing=true;renderExtras();try{audit=await crossCheck(snapshot)}catch{audit={status:"unavailable",asOf:Date.now(),tip:snapshot.tip}}finally{if(cache&&validAudit(audit,cache.tip)&&(!cache.audit||audit.asOf>=cache.audit.asOf)){cache.audit=audit;await saveCache(cache)}auditing=false;renderExtras()}}
+async function auditSources(){if(!cache||auditing)return;const snapshot=cache;auditing=true;auditProgress={source:snapshot.source==="toncenter"?"tonapi":"toncenter",pages:0,scanned:0,retry:false};renderExtras();try{audit=await crossCheck(snapshot,p=>{auditProgress={...auditProgress,...p,retry:!!p.retry};renderExtras()})}catch{audit={status:"unavailable",asOf:Date.now(),tip:snapshot.tip}}finally{if(cache&&validAudit(audit,cache.tip)&&(!cache.audit||audit.asOf>=cache.audit.asOf)){cache.audit=audit;await saveCache(cache)}auditing=false;auditProgress=null;renderExtras()}}
 function renderTransactions(){
  const r=txRange||range,valid=!!m&&!!r;
  $("tx-filters").querySelectorAll("button").forEach(b=>{b.disabled=!valid;b.setAttribute("aria-pressed",String(b.dataset.txType===txType))});
