@@ -1,3 +1,13 @@
+# Current handoff — v29 / technical roadmap
+
+**Read this first.** Current accepted application baseline is v29 (commit 6eedcb502bddc08581e9a0d269e55ce1b3721a08), with subsequent automated snapshot updates. Latest main before this documentation handoff: 07e46d4414a2ee735eee75b72ff6efe152a35fd2. No technical tasks implemented yet.
+
+Start a new session by reading this file, AUDIT.md, ROADMAP.md and DEVELOPMENT_RULES.md, fetching current main and inspecting the actual source. Resume at P1-01/P1-03 per roadmap. All 15 tasks are TODO. Do not rely on historical chat or restart the cosmetic phase.
+
+The historical notes below describe earlier iterations, including superseded requirements. They are retained for traceability; **latest v29 and rules take precedence**. In particular: v12 is only the preserved top-filter visual reference, not the current overall app baseline; date captions are now From/To without UTC; preview has no visible title, hint or close button; individual PNG has no creation timestamp or URL footer. Footer copy is the approved short v29 wording. Full methodology and exact data definitions remain.
+
+---
+
 # Pepegun Analytics — project handoff
 
 Updated 2026-11-26. This file records the repository-backed context and the user's latest UI requirements, not a full transcript.
