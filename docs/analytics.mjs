@@ -276,15 +276,15 @@ export function compareSnapshots(snapshot,other){
 // renders normally but is never sufficient for incremental auditing.
 const FULL_AUDIT_MAX_AGE=7*DAY;
 const canonicalRows=rows=>rows.slice().sort((a,b)=>compareLt(a.lt,b.lt)).map(r=>[r.h,r.lt,r.t,r.s,r.v,r.k,r.d]);
-async function checkpointDigest(c){
+async function checkpointDigest(c,fullAt,source){
  try{
-  const bytes=new TextEncoder().encode(JSON.stringify([c.version,c.address,c.tip,c.tipHash,c.firstTime,c.tipTime,c.scanned,c.ambiguous,c.history,canonicalRows(c.rows)]));
+  const bytes=new TextEncoder().encode(JSON.stringify(["pepegun-audit-proof-v1",fullAt,source,c.version,c.address,c.tip,c.tipHash,c.firstTime,c.tipTime,c.scanned,c.ambiguous,c.history,canonicalRows(c.rows)]));
   const digest=await globalThis.crypto.subtle.digest("SHA-256",bytes);
   return Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,"0")).join("");
  }catch{return null}
 }
 async function matchedAudit(snapshot,source,fullAt,method,scanned,rows,signal){
- const digest=await checkpointDigest(snapshot);
+ const digest=await checkpointDigest(snapshot,fullAt,source);
  checkAbort(signal);
  return auditResult(snapshot,"match",{source,scanned,rows,method,...(digest?{proof:{version:1,digest,fullAt}}:{})});
 }
@@ -295,7 +295,7 @@ async function incrementalAudit(snapshot,checkpoint,source,progress,signal){
  if(compareLt(checkpoint.tip,snapshot.tip)>0||checkpoint.firstTime!==snapshot.firstTime||checkpoint.ambiguous>snapshot.ambiguous)return null;
  if(!sameHistory(checkpoint.history,snapshot.history.slice(0,checkpoint.scanned)))return null;
  if(JSON.stringify(canonicalRows(checkpoint.rows))!==JSON.stringify(canonicalRows(snapshot.rows.filter(r=>compareLt(r.lt,checkpoint.tip)<=0))))return null;
- if(await checkpointDigest(checkpoint)!==proof.digest)return null;
+ if(await checkpointDigest(checkpoint,proof.fullAt,source)!==proof.digest)return null;
  checkAbort(signal);
  const match=()=>matchedAudit(snapshot,source,proof.fullAt,"incremental",snapshot.scanned,snapshot.rows.length,signal);
  const mismatch=()=>auditResult(snapshot,"mismatch",{source});
