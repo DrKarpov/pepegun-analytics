@@ -65,6 +65,8 @@ export function selectSnapshot(local,seed){
  const order=compareLt(local.tip,seed.tip);
  if(order!==0)return order>0?local:seed;
  if(local.tipHash!==seed.tipHash)return seed.audit?.status==="match"&&seed.audit.tip===seed.tip?seed:local;
+ if(!local.history&&seed.history)return seed;
+ if(local.history&&!seed.history)return local;
  return seed.asOf>local.asOf?seed:local;
 }
 export async function loadSeed(){
