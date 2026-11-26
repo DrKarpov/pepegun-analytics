@@ -42,11 +42,36 @@ async function recordCardText(page){
   window.__cardText=[];
  });
 }
+// A dialog is hidden as soon as close() removes open, before the queued
+// close event clears export-closing, resets preview and restores focus.
+// Wait for that cleanup rather than racing the next keyboard interaction.
+async function waitCardClosed(page){
+ await page.waitForFunction(()=>{
+  const d=document.querySelector("#card-export-menu"),p=document.querySelector("#card-export-preview");
+  return !d.open&&!d.classList.contains("export-closing")&&p.width===1&&p.height===1;
+ },null,{polling:50,timeout:10000});
+}
 async function inspectCardPng(page,id,{download=true,pixels=false}={}){
- await recordCardText(page);
+ await waitCardClosed(page);
  const card=page.locator('[data-card-export="'+id+'"]');
- await card.focus();await page.keyboard.press("Enter");
- await page.waitForFunction(()=>!document.querySelector("#card-export-download").disabled);
+ const scenario=await page.evaluate(()=>({lang:document.documentElement.lang,preset:document.querySelector("[data-range][aria-pressed=true]")?.dataset.range,range:document.querySelector("#range-note").textContent}));
+ const label=id+" "+JSON.stringify(scenario);
+ assert.equal(await card.isVisible(),true,label+" card hidden");
+ assert.equal(await card.getAttribute("tabindex"),"0",label+" card not exportable");
+ await recordCardText(page);
+ await card.focus();
+ assert.equal(await card.evaluate(e=>document.activeElement===e),true,label+" card focus failed");
+ await card.press("Enter");
+ try{
+  await page.waitForFunction(()=>{
+   const d=document.querySelector("#card-export-menu"),status=document.querySelector("#card-export-status").textContent;
+   return d.open&&(!document.querySelector("#card-export-download").disabled||/Image could not be prepared|Не удалось подготовить изображение/.test(status));
+  },null,{polling:50,timeout:10000});
+ }catch(error){
+  const state=await page.evaluate(()=>({open:document.querySelector("#card-export-menu").open,closing:document.querySelector("#card-export-menu").classList.contains("export-closing"),status:document.querySelector("#card-export-status").textContent,focus:document.activeElement?.outerHTML.slice(0,200),preview:document.querySelector("#card-export-preview").width,disabled:document.querySelector("#card-export-download").disabled}));
+  throw Error(label+" preview did not open: "+JSON.stringify(state),{cause:error});
+ }
+ assert.equal(await page.locator("#card-export-download").isEnabled(),true,label+" PNG preparation failed: "+await page.locator("#card-export-status").textContent());
  const entries=await page.evaluate(()=>window.__cardText);
  const preview=pixels?await page.locator("#card-export-preview").evaluate(e=>e.toDataURL()):null;
  if(download){
@@ -61,7 +86,7 @@ async function inspectCardPng(page,id,{download=true,pixels=false}={}){
    assert.equal(result,true,id+" preview and downloaded PNG pixels differ");
   }
  }else await page.keyboard.press("Escape");
- await page.locator("#card-export-menu").waitFor({state:"hidden"});
+ await waitCardClosed(page);
  return entries;
 }
 
@@ -357,7 +382,7 @@ try{
     assert.ok(previewColors.full>50&&previewColors.partial>50,name+" "+lang+" individual PNG preview contrast "+JSON.stringify(previewColors));
     const activityPng=await readDownload(contrastPage,"#card-export-download");
     assert.deepEqual(await pixelCounts(activityPng.toString("base64")),previewColors,name+" "+lang+" downloaded PNG matches preview color counts");
-    await contrastPage.locator("#card-export-menu").waitFor({state:"hidden"});
+    await waitCardClosed(contrastPage);
    }
 
    // P2-06: fixed clock allows exact expectations for rolling/calendar/custom
@@ -375,6 +400,7 @@ try{
      const activeDate=dateAt(preset==="custom"?day-86400:day,lang);
      const currentRange=(await contrastPage.locator("#range-note").innerText()).replace(/\s*·\s*UTC$/,"").replace(/\s+/g," ");
      for(const id of cardIds){
+      console.log(name,"P2-06",lang,preset,id);
       const entries=await inspectCardPng(contrastPage,id,{pixels:preset==="6h"});
       const all=entries.map(e=>e.text).join(" ");
       const green=entries.filter(e=>e.color==="#b5ef58"&&e.y<100).map(e=>e.text).join(" ");
