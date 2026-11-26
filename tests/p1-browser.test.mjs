@@ -27,7 +27,18 @@ const tc=t=>({account:RAW,hash:t.h,lt:t.lt,prev_trans_lt:t.prev,prev_trans_hash:
 const ta=t=>({account:{address:RAW},hash:t.h,lt:t.lt,prev_trans_lt:t.prev,prev_trans_hash:t.prevHash,utime:t.t,aborted:false,success:true,in_msg:{source:{address:t.m.s},value:t.m.v,bounced:false,decoded_op_name:"text_comment",decoded_body:{text:t.m.c}}});
 const ok=(route,transactions)=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({transactions})});
 const deny=route=>route.fulfill({status:403,body:"offline"});
-const waitStatus=async(page,word)=>page.waitForFunction(word=>document.querySelector("#status-text").textContent===word&&!document.querySelector("#refresh").disabled,word,{timeout:15000});
+// Playwright waitForFunction evaluates a string inside the page. That is
+// correctly forbidden by this CSP. Poll from Node using direct evaluate
+// instead: no bypassCSP context and no unsafe-eval in the document policy.
+async function waitUntil(page,predicate,arg=null,{timeout=30000,polling=50}={}){
+ const deadline=Date.now()+timeout;
+ for(;;){
+  if(await page.evaluate(predicate,arg))return;
+  if(Date.now()>=deadline)throw Error("Browser condition timed out: "+predicate.toString());
+  await new Promise(resolve=>setTimeout(resolve,polling));
+ }
+}
+const waitStatus=async(page,word)=>waitUntil(word=>document.querySelector("#status-text").textContent===word&&!document.querySelector("#refresh").disabled,word,{timeout:15000});
 const readDownload=async(page,selector)=>{const [download]=await Promise.all([page.waitForEvent("download"),page.locator(selector).click()]);return readFile(await download.path())};
 const cardIds=["overview","active","finite","growth","activity","fees"];
 const chartIds=["growth","activity","fees"];
@@ -46,7 +57,7 @@ async function recordCardText(page){
 // close event clears export-closing, resets preview and restores focus.
 // Wait for that cleanup rather than racing the next keyboard interaction.
 async function waitCardClosed(page){
- await page.waitForFunction(()=>{
+ await waitUntil(page,()=>{
   const d=document.querySelector("#card-export-menu"),p=document.querySelector("#card-export-preview");
   return !d.open&&!d.classList.contains("export-closing")&&p.width===1&&p.height===1;
  },null,{polling:50,timeout:10000});
@@ -63,7 +74,7 @@ async function inspectCardPng(page,id,{download=true,pixels=false}={}){
  assert.equal(await card.evaluate(e=>document.activeElement===e),true,label+" card focus failed");
  await card.press("Enter");
  try{
-  await page.waitForFunction(()=>{
+  await waitUntil(page,()=>{
    const d=document.querySelector("#card-export-menu"),status=document.querySelector("#card-export-status").textContent;
    return d.open&&(!document.querySelector("#card-export-download").disabled||/Image could not be prepared|Не удалось подготовить изображение/.test(status));
   },null,{polling:50,timeout:10000});
@@ -150,7 +161,7 @@ try{
    await startup.waitFor({state:"detached"});
    assert.ok(await page.evaluate(()=>performance.now()>=400));
    assert.equal(await page.locator(".page").evaluate(e=>getComputedStyle(e).visibility),"visible");
-   await page.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
+   await waitUntil(page,()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
    mode="prior";await page.locator("#refresh").click();await waitStatus(page,"Earlier history checked");assert.equal(await startup.count(),0);
    // P2-06: prior-history status stays on the site but not on any individual PNG.
    await page.locator('[data-range="7d"]').click();
@@ -191,7 +202,7 @@ try{
    }
    await page.evaluate(()=>window.__canvasText=[]);
    await page.locator("#overview").focus();await page.keyboard.press("Enter");
-   await page.waitForFunction(()=>!document.querySelector("#card-export-download").disabled);
+   await waitUntil(page,()=>!document.querySelector("#card-export-download").disabled);
    assert.ok((await page.evaluate(()=>window.__canvasText)).some(t=>t.includes("Источники расходятся")));
    assert.ok((await page.evaluate(()=>window.__cardText)).some(e=>e.color==="#ffb16b"&&e.text.includes("Источники расходятся")&&e.text.includes("Сохранённые данные")));
    const card=await readDownload(page,"#card-export-download");
@@ -225,7 +236,7 @@ try{
    const originalMetrics=await legacyPage.locator("#overview").innerText();
    await legacyPage.locator("#audit-check").click();
    await legacyPage.getByRole("button",{name:"Отменить сверку",exact:true}).click();
-   await legacyPage.waitForFunction(()=>document.querySelector("#audit-result").textContent.includes("Сверка отменена")&&!document.querySelector("#audit-check").disabled);
+   await waitUntil(legacyPage,()=>document.querySelector("#audit-result").textContent.includes("Сверка отменена")&&!document.querySelector("#audit-check").disabled);
    await waitStatus(legacyPage,"Ожидается сверка");
    assert.equal(await legacyPage.locator("#audit-progress").isVisible(),false);
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
@@ -238,16 +249,16 @@ try{
    // publication of the same chain tip. An ordinary refresh must recover.
    legacySeed={...snapshot,audit:{...snapshot.audit,asOf:now}};
    await legacyPage.locator("#refresh").click();
-   await legacyPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
+   await waitUntil(legacyPage,()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    assert.equal(await legacyPage.locator("#overview").innerText(),originalMetrics);
    await legacyPage.reload();
    await legacyPage.locator("#startup-screen").waitFor({state:"detached"});
-   await legacyPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
+   await waitUntil(legacyPage,()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
    // A subsequent unsuccessful retry must not erase the confirmed history.
    await legacyPage.locator("#method-section summary").click();
    await legacyPage.locator("#audit-check").click();
-   await legacyPage.waitForFunction(()=>!document.querySelector("#audit-check").disabled&&document.querySelector("#status").className==="status "&&document.querySelector("#audit-result").textContent.includes("Второй индексатор"));
+   await waitUntil(legacyPage,()=>!document.querySelector("#audit-check").disabled&&document.querySelector("#status").className==="status "&&document.querySelector("#audit-result").textContent.includes("Второй индексатор"));
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    // P2-04: exercise the real chart DOM in both engines with multiple bins.
    // Synthetic PointerEvents cover deterministic direction/cancel cases;
@@ -316,7 +327,7 @@ try{
      await legacyPage.waitForTimeout(30);
     }
     await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
-    await legacyPage.waitForFunction(start=>scrollY>start+20,beforeScroll);
+    await waitUntil(legacyPage,start=>scrollY>start+20,beforeScroll);
     assert.equal(await touchPlot.locator(".cursor").getAttribute("x1"),beforeCursor,"native vertical scroll must not select chart point");
     await session.detach();
    }
@@ -334,7 +345,7 @@ try{
    await press(exportCard,"pointerdown");
    await legacyPage.locator("#card-export-menu").waitFor({state:"visible"});
    await press(exportCard,"pointerup");
-   await legacyPage.waitForFunction(()=>!document.querySelector("#card-export-download").disabled);
+   await waitUntil(legacyPage,()=>!document.querySelector("#card-export-download").disabled);
    await legacyPage.keyboard.press("Escape");
    await legacyPage.locator("#card-export-menu").waitFor({state:"hidden"});
    await assertNoCsp(legacyPage,name+" migration");
@@ -357,7 +368,7 @@ try{
    const contrastPage=await contrastCtx.newPage();
    await contrastPage.clock.setFixedTime(new Date(contrastNow));
    await contrastPage.goto(url);await contrastPage.locator("#startup-screen").waitFor({state:"detached"});
-   await contrastPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
+   await waitUntil(contrastPage,()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
    const background=[23,26,24],foreground=[96,115,103];
    const lum=rgb=>rgb.map(n=>{n/=255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
    const ratio=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
@@ -394,7 +405,7 @@ try{
     assert.ok(globalColors.full>50&&globalColors.partial>50,name+" "+lang+" global PNG returning contrast "+JSON.stringify(globalColors));
     const activity=contrastPage.locator('[data-card-export="activity"]');
     await activity.focus();await contrastPage.keyboard.press("Enter");
-    await contrastPage.waitForFunction(()=>!document.querySelector("#card-export-download").disabled);
+    await waitUntil(contrastPage,()=>!document.querySelector("#card-export-download").disabled);
     const previewColors=await pixelCounts("",true);
     assert.ok(previewColors.full>50&&previewColors.partial>50,name+" "+lang+" individual PNG preview contrast "+JSON.stringify(previewColors));
     const activityPng=await readDownload(contrastPage,"#card-export-download");
@@ -454,7 +465,7 @@ try{
    const policyPage=await policyCtx.newPage();
    await policyPage.goto(url);
    await policyPage.locator("#startup-screen").waitFor({state:"detached"});
-   await policyPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
+   await waitUntil(policyPage,()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
    assert.ok(rawAttempts>0&&localAttempts>0&&primaryAttempts>0&&alternateAttempts>0,name+" allowed snapshot/provider fallback not exercised");
    assert.equal(await policyPage.locator("#overview .kpi-value").first().innerText(),"3");
    // Existing inline style attributes are necessary for chart legends and
@@ -486,7 +497,7 @@ try{
     return {denied,inline:window.__inlineExecuted,base:document.baseURI,style:getComputedStyle(document.documentElement).getPropertyValue("--csp-injected").trim()};
    });
    assert.equal(probe.denied,true);assert.equal(probe.inline,false);assert.equal(probe.style,"");assert.ok(probe.base.startsWith(url));
-   await policyPage.waitForFunction(()=>["script-src","connect-src","img-src","base-uri","style-src"].every(prefix=>window.__cspViolations.some(v=>v.directive.startsWith(prefix)&&v.disposition==="enforce")));
+   await waitUntil(policyPage,()=>["script-src","connect-src","img-src","base-uri","style-src"].every(prefix=>window.__cspViolations.some(v=>v.directive.startsWith(prefix)&&v.disposition==="enforce")));
    const violations=await policyPage.evaluate(()=>window.__cspViolations);
    assert.ok(violations.some(v=>v.directive.startsWith("script-src")&&v.blocked==="inline"));
    assert.ok(violations.some(v=>v.directive.startsWith("script-src")&&v.blocked.startsWith("https://blocked.invalid")));
@@ -508,7 +519,7 @@ try{
    await offlinePage.locator("#startup-screen").waitFor({state:"visible"});
    assert.equal(await offlinePage.locator("#startup-screen").evaluate(e=>getComputedStyle(e).transitionDuration),"0s");
    await offlinePage.locator("#startup-screen").waitFor({state:"detached",timeout:10000});
-   await offlinePage.waitForFunction(()=>!document.querySelector("#refresh").disabled);
+   await waitUntil(offlinePage,()=>!document.querySelector("#refresh").disabled);
    assert.equal(await offlinePage.locator(".page").evaluate(e=>getComputedStyle(e).visibility),"visible");
    await assertNoCsp(offlinePage,name+" offline");
    await offline.close();
