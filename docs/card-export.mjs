@@ -13,7 +13,7 @@ function capture(card,meta){
  }
  if(id==="active")return {...base,title:text(card,".activity-title strong"),subtitle:text(card,".activity-title small"),tiles:[...card.querySelectorAll(".active-stat")].map(k=>({label:text(k,"small"),value:text(k,"strong"),hint:""}))};
  const svg=card.querySelector(".chart-plot");if(!svg)throw Error("Chart unavailable");
- const clone=svg.cloneNode(true),view=svg.viewBox.baseVal;clone.setAttribute("xmlns","http://www.w3.org/2000/svg");clone.setAttribute("font-family","system-ui, sans-serif");clone.removeAttribute("tabindex");clone.setAttribute("width",String(view.width));clone.setAttribute("height",String(view.height));
+ const clone=svg.cloneNode(true),view=svg.viewBox.baseVal;clone.setAttribute("xmlns","http://www.w3.org/2000/svg");clone.setAttribute("font-family","system-ui, sans-serif");clone.removeAttribute("tabindex");clone.querySelectorAll(".cursor").forEach(el=>el.remove());clone.setAttribute("width",String(view.width));clone.setAttribute("height",String(view.height));
  return {...base,title:text(card,"h2"),subtitle:text(card,".chart-interval"),description:text(card,".sub"),readout:text(card,".chart-readout"),svg:new XMLSerializer().serializeToString(clone),ratio:view.height/view.width,legend:[...card.querySelectorAll(".chart-legend span")].map(s=>({label:s.textContent.trim(),color:s.querySelector("i")?.style.backgroundColor||palette.accent}))};
 }
 // Export-only timezone label: once, immediately after an actual clock time.
@@ -79,7 +79,7 @@ export async function renderCardPng(s){
  return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error("PNG unavailable")),"image/png"));
 }
 export function setupCardExport(getMeta,download){
- const dialog=document.getElementById("card-export-menu"),hint=document.getElementById("card-export-hint"),title=document.getElementById("card-export-title"),save=document.getElementById("card-export-download"),share=document.getElementById("card-export-share"),cancel=document.getElementById("card-export-cancel"),status=document.getElementById("card-export-status"),preview=document.getElementById("card-export-preview"),actions=document.getElementById("card-export-actions");
+ const dialog=document.getElementById("card-export-menu"),hint=document.getElementById("card-export-hint"),title=document.getElementById("card-export-title"),save=document.getElementById("card-export-download"),share=document.getElementById("card-export-share"),cancel=document.getElementById("card-export-cancel"),status=document.getElementById("card-export-status"),preview=document.getElementById("card-export-preview"),previewFrame=document.getElementById("card-export-preview-frame"),actions=document.getElementById("card-export-actions");
  const cards=[...document.querySelectorAll("[data-card-export]")];let press=null,timer=0,serial=0,ready=null,origin=null,previewUrl=null,closing=false;
  const root=document.documentElement;
  const setInput=mode=>{root.dataset.inputMode=mode};setInput("pointer");
@@ -88,7 +88,7 @@ export function setupCardExport(getMeta,download){
  const stop=()=>{clearTimeout(timer);timer=0;press?.card.classList.remove("export-holding");press=null};
  const clearHold=()=>{stop();for(const card of cards)card.classList.remove("export-holding")};
  const excluded=target=>!!target.closest("button,a,input,select,textarea,.chart-plot");
- const clearPreview=()=>{preview.hidden=true;preview.removeAttribute("src");if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null}};
+ const clearPreview=()=>{previewFrame.hidden=true;preview.width=1;preview.height=1;preview.removeAttribute("aria-label");if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null}};
  function update(){const meta=getMeta(),L=labels[meta.lang];hint.textContent=L.hint;hint.hidden=!meta.valid;for(const card of cards){card.tabIndex=meta.valid&&!card.hidden?0:-1;card.setAttribute("aria-description",L.hint)}}
  function close(){
   clearHold();if(!dialog.open||closing)return;closing=true;serial++;ready=null;save.disabled=share.disabled=true;dialog.classList.add("export-closing");
@@ -102,10 +102,14 @@ export function setupCardExport(getMeta,download){
   try{
    const blob=await renderCardPng(s);if(token!==serial||!dialog.open||closing)return;
    const name="pepegun-"+s.id+"-"+meta.anchor+".png";let file=null;try{file=new File([blob],name,{type:"image/png"})}catch{}
-   previewUrl=URL.createObjectURL(blob);preview.src=previewUrl;preview.alt=s.title;
-   if(typeof preview.decode==="function")await preview.decode();else await imageFrom(previewUrl);
+   const url=URL.createObjectURL(blob);previewUrl=url;
+   const image=await imageFrom(url);
    if(token!==serial||!dialog.open||closing)return;
-   ready={blob,name,file,L};preview.hidden=false;save.disabled=false;let canShare=false;try{canShare=!!file&&typeof navigator.canShare==="function"&&navigator.canShare({files:[file]})}catch{}
+   preview.width=image.naturalWidth;preview.height=image.naturalHeight;
+   const ctx=preview.getContext("2d");if(!ctx)throw Error("Preview unavailable");
+   ctx.drawImage(image,0,0);preview.setAttribute("aria-label",s.title);
+   URL.revokeObjectURL(url);previewUrl=null;
+   ready={blob,name,file,L};previewFrame.hidden=false;save.disabled=false;let canShare=false;try{canShare=!!file&&typeof navigator.canShare==="function"&&navigator.canShare({files:[file]})}catch{}
    share.hidden=!canShare;share.disabled=!canShare;actions.classList.toggle("single",!canShare);status.textContent="";
   }catch{if(token===serial&&dialog.open&&!closing){clearPreview();status.textContent=L.failed}}
  }
@@ -119,6 +123,7 @@ export function setupCardExport(getMeta,download){
  window.addEventListener("pointerdown",e=>{if(e.isPrimary===false)stop()},{passive:true});
  save.addEventListener("click",()=>{if(ready){download(ready.blob,ready.name);close()}});
  share.addEventListener("click",async()=>{if(!ready?.file)return;const s=ready;try{await navigator.share({files:[s.file],title:"Pepegun Analytics"});close()}catch(e){if(e.name!=="AbortError"&&ready===s)status.textContent=s.L.shareFailed}});
+ previewFrame.addEventListener("contextmenu",e=>e.preventDefault());previewFrame.addEventListener("dragstart",e=>e.preventDefault());
  cancel.addEventListener("click",close);dialog.addEventListener("cancel",e=>{e.preventDefault();close()});dialog.addEventListener("click",e=>{if(e.target===dialog)close()});dialog.addEventListener("close",()=>{clearHold();serial++;ready=null;clearPreview();dialog.classList.remove("export-closing");closing=false;if(origin&&root.dataset.inputMode==="keyboard")origin.focus({preventScroll:true});else{const focused=document.activeElement;if(focused instanceof HTMLElement||focused instanceof SVGElement){if(focused.closest("[data-card-export],#card-export-menu"))focused.blur?.()}}origin=null});
  update();return update;
 }

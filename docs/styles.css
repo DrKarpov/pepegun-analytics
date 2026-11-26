@@ -371,7 +371,9 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 #card-export-cancel svg{width:18px;height:18px}
 .card-export-sheet .sub{margin:0}
 .card-export-sheet .sub:empty{display:none}
-#card-export-preview{display:block;max-width:100%;width:100%;height:auto;max-height:calc(100vh - 170px);max-height:calc(100dvh - 170px);object-fit:contain;border-radius:8px}
+#card-export-preview-frame{min-width:0;max-width:100%;overflow:hidden;border-radius:8px;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+#card-export-preview-frame[hidden]{display:none}
+#card-export-preview{display:block;max-width:100%;width:100%;height:auto;max-height:calc(100vh - 170px);max-height:calc(100dvh - 170px);object-fit:contain;border-radius:8px;pointer-events:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .card-export-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .card-export-actions.single{grid-template-columns:minmax(0,1fr)}
 .card-export-actions .outline{width:100%;min-width:0;min-height:44px;border-radius:999px;border:1px solid var(--accent);background:#1a2417;color:var(--accent);padding-inline:6px;font-weight:600;white-space:normal}

@@ -51,3 +51,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v23 focus and export time labels
 - User screenshots showed persistent native focus rings on cards, chart SVG and close button after touch/open/close/download. Explicit pointer/keyboard modality suppresses pointer focus rings; keyboard access retained. Hold animation remains the only pointer-triggered card outline and is cleared on open/close. Close icon uses color/background for keyboard focus, no outline. Individual PNG uses one UTC marker only next to an actual clock time (timed range preferred, otherwise data timestamp); removes UTC from calendar subtitles and date-only ranges. Global export and on-site time calculations unchanged.
+
+## v24 clean graph export and passive preview
+- Remove only .cursor from the cloned chart SVG before serializing it; the live chart, selected-point readout, axes, series and legend remain unchanged. Applies to all three individual chart exports and their previews. Replace the modal img with a passive canvas drawing the exact generated PNG; disable context menu and dragging on its wrapper. Download/share still use the original PNG blob. This addresses the native iOS image callout and unintended enlargement without disabling normal page scrolling or pinch zoom. Real iOS verification remains required.
