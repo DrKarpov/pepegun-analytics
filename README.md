@@ -17,6 +17,124 @@ Independent community on-chain analytics for the Pepegun fee collector on TON. N
 
 Static GitHub Pages serves `docs/`, without a server, database, runtime third-party JS dependency or paid provider.
 
+### Browser runtime
+
+All analytics and rendering run in the browser. The application coordinates the data layer and the UI; no private backend is involved.
+
+```mermaid
+flowchart TB
+    BROWSER["Browser · Mobile / Desktop"]
+    BROWSER --> HTML["index.html · CSP"]
+
+    subgraph SITE["STATIC SITE · GitHub Pages"]
+        direction TB
+        HTML --> START["startup-screen.mjs"]
+        HTML --> CSS["styles.css"]
+        HTML --> APP["app.mjs<br/>State · Filters · Orchestration"]
+
+        subgraph UI["PRESENTATION"]
+            direction TB
+            I18N["i18n.mjs<br/>RU / EN · Formatting"]
+            CHARTS["charts.mjs<br/>SVG · Gestures"]
+            FULL["dashboard-export.mjs<br/>Full PNG"]
+            CARD["card-export.mjs<br/>Card PNG · Share"]
+            PALETTE["chart-style.mjs<br/>Shared chart palette"]
+            CHARTS --> PALETTE
+            FULL --> PALETTE
+        end
+
+        subgraph DATA["DATA & ANALYTICS"]
+            direction TB
+            INSIGHTS["insights.mjs<br/>Derived metrics · Series · CSV"]
+            ANALYTICS["analytics.mjs<br/>History · Validation · Sync"]
+            INSIGHTS --> ANALYTICS
+        end
+
+        APP --> I18N
+        APP --> CHARTS
+        APP --> FULL
+        APP --> CARD
+        APP --> INSIGHTS
+        APP --> ANALYTICS
+    end
+
+    subgraph SOURCES["PUBLIC DATA SOURCES"]
+        direction LR
+        TC["Toncenter v3"]
+        TA["TonAPI v2"]
+        RAW["Raw GitHub<br/>snapshot.json"]
+        SEED["Same-origin<br/>snapshot.json"]
+    end
+
+    subgraph STORAGE["LOCAL BROWSER STORAGE"]
+        direction LR
+        IDB[("IndexedDB<br/>History cache")]
+        PREF["localStorage<br/>Language preference"]
+    end
+
+    ANALYTICS --> TC
+    ANALYTICS --> TA
+    ANALYTICS <--> IDB
+    INSIGHTS -->|Preferred seed| RAW
+    INSIGHTS -->|Fallback seed| SEED
+    I18N <--> PREF
+
+    classDef entry fill:#1a2417,stroke:#b5ef58,color:#edf1ee,stroke-width:2px;
+    classDef core fill:#25321d,stroke:#b5ef58,color:#edf1ee,stroke-width:2px;
+    classDef ui fill:#1d211e,stroke:#607367,color:#edf1ee;
+    classDef data fill:#172822,stroke:#71c5b3,color:#edf1ee;
+    classDef source fill:#171a18,stroke:#71c5b3,color:#edf1ee;
+    classDef storage fill:#171a18,stroke:#e7be78,color:#edf1ee;
+    class BROWSER,HTML entry;
+    class APP core;
+    class START,CSS,I18N,CHARTS,FULL,CARD,PALETTE ui;
+    class INSIGHTS,ANALYTICS data;
+    class TC,TA,RAW,SEED source;
+    class IDB,PREF storage;
+```
+
+Arrows show the principal runtime relationships and resource access, not every JavaScript import. The raw GitHub and same-origin seed contain the same published snapshot format. IndexedDB and language preference are stored on the device.
+
+### Snapshot and release pipeline
+
+Code verification and snapshot generation run separately in GitHub Actions. A documentation or UI-only change does not regenerate blockchain history.
+
+```mermaid
+flowchart TB
+    subgraph HISTORY["HISTORY PIPELINE"]
+        TIMER["Schedule · Manual run<br/>Relevant data-code changes"] --> GENERATE["scripts/snapshot.mjs"]
+        TC2["Toncenter / TonAPI"] --> GENERATE
+        GENERATE --> VALIDATE["History validation<br/>Independent audit"]
+        VALIDATE --> SNAPTEST["Snapshot regression tests"]
+        SNAPTEST -->|Validated snapshot| SNAPSHOT["docs/snapshot.json"]
+    end
+
+    subgraph CODE["CODE VERIFICATION"]
+        CHANGE["Pull request / Code push"] --> NODE["Node.js regressions<br/>Read-only live checks"]
+        NODE --> BROWSERS["Chromium + WebKit<br/>UI · CSP · Exports"]
+        BROWSERS --> BASELINE["Pinned baseline comparison"]
+    end
+
+    SNAPSHOT -->|Commit updated history| MAIN["main branch"]
+    BASELINE -.->|Verification gate for PR merge| MAIN
+    MAIN --> PAGES["GitHub Pages<br/>Static dashboard"]
+    MAIN --> RAW2["Raw GitHub snapshot<br/>Browser seed"]
+
+    classDef trigger fill:#1d211e,stroke:#607367,color:#edf1ee;
+    classDef process fill:#172822,stroke:#71c5b3,color:#edf1ee;
+    classDef gate fill:#29241a,stroke:#e7be78,color:#edf1ee;
+    classDef release fill:#25321d,stroke:#b5ef58,color:#edf1ee,stroke-width:2px;
+    class TIMER,CHANGE,TC2 trigger;
+    class GENERATE,VALIDATE,NODE,BROWSERS process;
+    class SNAPTEST,BASELINE gate;
+    class SNAPSHOT,MAIN,PAGES,RAW2 release;
+```
+
+The snapshot workflow checks transaction continuity, compares indexers and runs regressions before publishing. A detected history disagreement blocks snapshot publication; provider unavailability is recorded as a distinct audit state. The browser can continue using a validated cached or published snapshot when live sources fail.
+
+### Module responsibilities
+
+
 | File | Responsibility |
 |---|---|
 | `index.html`, `styles.css` | Document, responsive visual system, early meta CSP |
