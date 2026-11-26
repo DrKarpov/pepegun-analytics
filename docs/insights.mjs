@@ -1,4 +1,4 @@
-import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,validAudit,validCache,auditTrust,mergeAudit,exact,weekIndex,weekStart} from "./analytics.mjs?v=30";
+import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,validAudit,validCache,auditTrust,mergeAudit,historyConflict,exact,weekIndex,weekStart} from "./analytics.mjs?v=30";
 export function extraMetrics(rows,range,now){
  const to=Math.min(range.to,now+1),from=range.from,firstPay=new Map(),feeValues=[],byWallet=new Map(),newPayers=new Set();let total=0n;
  for(const r of rows){const t=r.t*1000;if(t>=to||r.k!=="fee")continue;if(!firstPay.has(r.s)||firstPay.get(r.s)>t)firstPay.set(r.s,t);if(t<from)continue;const v=BigInt(r.v);feeValues.push(v);total+=v;byWallet.set(r.s,(byWallet.get(r.s)||0n)+v);}
@@ -63,20 +63,18 @@ export function validateSeed(s){
 export function selectSnapshot(local,seed){
  if(!validCache(local))return validCache(seed)?seed:null;
  if(!validCache(seed))return local;
- const order=compareLt(local.tip,seed.tip);
+ const order=compareLt(local.tip,seed.tip),conflict=historyConflict(local,seed);
  let chosen;
- if(order!==0)chosen=order>0?local:seed;
- else if(auditTrust(local)==="mismatch"&&auditTrust(seed)==="match")chosen=seed;
+ // Keep the last accepted history on conflicting extensions; use an independently
+ // verified seed for an equal-tip conflict if local has no equivalent verification.
+ if(conflict)chosen=order===0&&auditTrust(seed)==="match"&&auditTrust(local)!=="match"?seed:local;
+ else if(order!==0)chosen=order>0?local:seed;
  else if(auditTrust(seed)==="match"&&auditTrust(local)!=="match")chosen=seed;
  else if(auditTrust(local)==="match"&&auditTrust(seed)!=="match")chosen=local;
- else if(local.tipHash!==seed.tipHash)chosen=seed;
  else if(!local.history&&seed.history)chosen=seed;
  else if(local.history&&!seed.history)chosen=local;
  else chosen=seed.asOf>local.asOf?seed:local;
- const conflict=order===0&&local.tipHash!==seed.tipHash;
- // Equal-tip, conflicting histories must never silently produce a green claim.
- const sameTipConflict=conflict||(order===0&&local.history&&seed.history&&local.history.some((row,i)=>row[0]!==seed.history[i]?.[0]||row[1]!==seed.history[i]?.[1]));
- const inherited=mergeAudit(chosen,local.audit,seed.audit,sameTipConflict?{status:"mismatch",tip:chosen.tip,asOf:Math.max(local.asOf,seed.asOf)}:null);
+ const inherited=mergeAudit(chosen,local.audit,seed.audit,conflict?{status:"mismatch",tip:chosen.tip,asOf:Math.max(local.asOf,seed.asOf,local.audit?.asOf||0,seed.audit?.asOf||0)}:null);
  return {...chosen,audit:inherited};
 }
 export async function loadSeed(){
