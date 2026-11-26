@@ -6,19 +6,19 @@ Goal: strengthen reliability and maintainability without redesigning the approve
 
 ## Status and resume pointer
 
-- Cosmetic phase v29: complete in main. No technical roadmap task has been started or completed.
+- Cosmetic phase v29: complete in main. P1-01/P1-03 implementation started on a separate branch; no technical task is DONE in main.
 - Progress: 0 / 15.
-- Next: P1-01 and P1-03, jointly design full-history identity, hash linkage and cache migration. Read actual current source and verify provider contracts before editing. P1-02 can be implemented independently; P1-04 covers the whole P1 batch.
+- Next: resume [work/p1-integrity](https://github.com/drkarpov/pepegun-analytics/tree/work/p1-integrity) at 28314d9fe47e0b78449da41f4b2c810705bb6476. Review and finish P1-01/03 (provider live evidence, legacy audit trust, cache-busting, failure fixtures, actual Node/CI); then implement P1-02 and finish P1-04. Existing main application remains unchanged.
 - State vocabulary: TODO, IN PROGRESS, BLOCKED, VERIFIED (branch), DONE (main + verification). A code change without required tests is not DONE.
 
 ## Stage 1 — P1: data reliability (0/4)
 
 | ID | Task | Acceptance criteria | Dependencies | Status |
 |---|---|---|---|---|
-| P1-01 | Compare complete ordered transaction identities | Earlier unclassified hash alteration no longer matches; common-tip comparison, no duplicates; valid historical snapshot and cache migration tested. | Coordinate P1-03 | TODO |
+| P1-01 | Compare complete ordered transaction identities | Earlier unclassified hash alteration no longer matches; common-tip comparison, no duplicates; valid historical snapshot and cache migration tested. | Coordinate P1-03 | IN PROGRESS |
 | P1-02 | Surface indexer mismatches | Main indicator and relevant exports clearly distinguish suspect data, prior-tip check and unavailable source; no green verified claim during known mismatch; preserve last known data; test precedence and concurrent refresh. | None; coordinate P1-01 | TODO |
-| P1-03 | Strengthen history continuity | Validate LT and available previous hashes, verify incremental anchor; reject missing/gapped/inconsistent chains safely; test both API shapes and legacy cache/snapshot compatibility. | Coordinate P1-01 | TODO |
-| P1-04 | Add integrity regression tests | Reproduce all P1 findings and demonstrate fixes; exercise corrupt input, common-tip, incremental/full/fallback cases; existing analytics/insights/snapshot tests remain passing. | P1-01/02/03 (tests developed alongside changes) | TODO |
+| P1-03 | Strengthen history continuity | Validate LT and available previous hashes, verify incremental anchor; reject missing/gapped/inconsistent chains safely; test both API shapes and legacy cache/snapshot compatibility. | Coordinate P1-01 | IN PROGRESS |
+| P1-04 | Add integrity regression tests | Reproduce all P1 findings and demonstrate fixes; exercise corrupt input, common-tip, incremental/full/fallback cases; existing analytics/insights/snapshot tests remain passing. | P1-01/02/03 (tests developed alongside changes) | IN PROGRESS |
 
 Stage gate: evidence-backed source contracts, migration and failure handling, metric reconciliation against a fixed snapshot, reviewed diff, successful CI and documented residual limitations. Do not publish a new schema that breaks existing deployed clients.
 
@@ -52,5 +52,7 @@ Test infrastructure can be introduced earlier to protect P1/P2. Stage numbering 
 | Date | Task | Branch / commit | Checks | Result / next |
 |---|---|---|---|---|
 | 2026-11-26 | Documentation handoff | main (see git history) | Audit evidence and task list transcribed | 15 TODO; begin P1 |
+
+| 2026-11-26 | P1-01/03 and initial P1-04 fixtures | [c9fee7c](https://github.com/drkarpov/pepegun-analytics/commit/c9fee7c0e5bfe5c11f77705009f3decbfaf5ddbb), [8c0c36d](https://github.com/drkarpov/pepegun-analytics/commit/8c0c36dd1d099b914947e2d8ee6da145b832523d), [da47494](https://github.com/drkarpov/pepegun-analytics/commit/da474944f4693c63eebee2d832c551fbdbd6a88d), [d353c4d](https://github.com/drkarpov/pepegun-analytics/commit/d353c4d9525ba0d0546cdfabd1c3d8ca19c8061c), [28314d9](https://github.com/drkarpov/pepegun-analytics/commit/28314d9fe47e0b78449da41f4b2c810705bb6476) | Isolated V8: original defect reproduced; analytics 25, insights 70, fixed snapshot 4626, integrity 23 (network fixtures with URL/abort/timer shims). Not actual Node or CI. | Full LT/hash cache history, optional previous-hash linkage, safe incremental anchor/full rebuild, same-tip complete seed preference, published history prefix check. Changed analytics.mjs, insights.mjs, snapshot.mjs, integrity.test.mjs. No public schema change. Need live API verification, actual Node/CI, cache-busting, review of generator and failure paths; P1-02 remains TODO. Existing push workflow checks out main, not task branch; do not mistake it for branch CI. |
 
 After each work unit add an entry with exact commit, changed files or linked diff, tests actually executed and their results, blockers, and next action. Update status and resume pointer in the same commit where practical. If a task is only proposed, leave it TODO. Keep previous entries. See DEVELOPMENT_RULES.md.
