@@ -48,3 +48,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v22 compact individual export
 - Approved: 600ms hold, 1.5% scale and green/teal animated outline only during hold, no pointer-focus ring, preserve keyboard focus. Compact methodology-colored preview dialog, close icon/backdrop/Escape, same PNG preview/download/share, reduced motion respected. Share hidden if native file sharing unavailable. Individual PNG: 16px outer padding, compact original logo and title, period and as-of line, no website/repo/footer; joined metric cells and active count before label. Full dashboard export and analytics unchanged.
+
+## v23 focus and export time labels
+- User screenshots showed persistent native focus rings on cards, chart SVG and close button after touch/open/close/download. Explicit pointer/keyboard modality suppresses pointer focus rings; keyboard access retained. Hold animation remains the only pointer-triggered card outline and is cleared on open/close. Close icon uses color/background for keyboard focus, no outline. Individual PNG uses one UTC marker only next to an actual clock time (timed range preferred, otherwise data timestamp); removes UTC from calendar subtitles and date-only ranges. Global export and on-site time calculations unchanged.

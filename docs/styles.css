@@ -378,3 +378,11 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 .card-export-actions .outline:hover:not(:disabled){background:#26351e;color:var(--accent)}
 .card-export-actions .outline:focus-visible{border-radius:999px}
 @media(prefers-reduced-motion:reduce){[data-card-export]{transition:none}[data-card-export].export-holding{transform:none}[data-card-export]::after{transition:none}#card-export-menu[open],#card-export-menu::backdrop{animation:none}}
+
+/* v23: pointer interactions must never leave a focus ring. Keyboard focus stays accessible. */
+html[data-input-mode="pointer"] :is(button,a,input,summary,[tabindex],svg):focus,
+html[data-input-mode="pointer"] :is(button,a,input,summary,[tabindex],svg):focus-visible{outline:none!important}
+#card-export-menu:focus,#card-export-menu:focus-visible,#card-export-title:focus{outline:none}
+#card-export-cancel:focus-visible{outline:none;color:var(--accent)}
+html[data-input-mode="pointer"] #card-export-cancel:focus{color:var(--muted)}
+html[data-input-mode="keyboard"] #card-export-cancel:focus-visible{background:var(--card);color:var(--accent)}
