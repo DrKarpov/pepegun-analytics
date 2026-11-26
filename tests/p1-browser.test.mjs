@@ -42,7 +42,7 @@ async function recordCardText(page){
   window.__cardText=[];
  });
 }
-async function exportCard(page,id,{download=true,pixels=false}={}){
+async function inspectCardPng(page,id,{download=true,pixels=false}={}){
  await recordCardText(page);
  const card=page.locator('[data-card-export="'+id+'"]');
  await card.focus();await page.keyboard.press("Enter");
@@ -121,7 +121,7 @@ try{
     if(await page.locator("html").getAttribute("lang")!==lang)await page.locator("#language").click();
     await waitStatus(page,lang==="ru"?"Проверена ранняя история":"Earlier history checked");
     for(const id of cardIds){
-     const entries=await exportCard(page,id,{download:false});
+     const entries=await inspectCardPng(page,id,{download:false});
      const all=entries.map(e=>e.text).join(" ");
      assert.doesNotMatch(all,/Earlier history checked|Проверена ранняя история/);
      assert.doesNotMatch(all,/Saved data|Сохранённые данные|Cached data/);
@@ -156,6 +156,7 @@ try{
    await page.locator("#overview").focus();await page.keyboard.press("Enter");
    await page.waitForFunction(()=>!document.querySelector("#card-export-download").disabled);
    assert.ok((await page.evaluate(()=>window.__canvasText)).some(t=>t.includes("Источники расходятся")));
+   assert.ok((await page.evaluate(()=>window.__cardText)).some(e=>e.color==="#ffb16b"&&e.text.includes("Источники расходятся")&&e.text.includes("Сохранённые данные")));
    const card=await readDownload(page,"#card-export-download");
    assert.equal(card.subarray(1,4).toString(),"PNG");
    assert.equal(await page.locator("#notice").isVisible(),false);
@@ -175,6 +176,7 @@ try{
    });
    const legacyPage=await migration.newPage();
    await legacyPage.goto(url);await legacyPage.locator("#startup-screen").waitFor({state:"detached"});await waitStatus(legacyPage,"Ожидается сверка");
+   {const entries=await inspectCardPng(legacyPage,"overview",{download:false});assert.ok(entries.some(e=>e.color==="#ffb16b"&&e.text.includes("Ожидается сверка")),"material warning must remain in PNG");}
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    const top=await legacyPage.locator("#overview").evaluate(e=>e.getBoundingClientRect().top);
    await legacyPage.locator("#refresh").click();
@@ -192,6 +194,7 @@ try{
    assert.equal(await legacyPage.locator("#overview").innerText(),originalMetrics);
    slowAudit=false;
    await legacyPage.locator("#audit-check").click();await waitStatus(legacyPage,"Сверка недоступна");
+   {const entries=await inspectCardPng(legacyPage,"overview",{download:false});assert.ok(entries.some(e=>e.color==="#ffb16b"&&e.text.includes("Сверка недоступна")),"material warning must remain in PNG");}
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    // The user-reported regression: local unavailable is newer than a verified
    // publication of the same chain tip. An ordinary refresh must recover.
@@ -372,7 +375,7 @@ try{
      const activeDate=dateAt(preset==="custom"?day-86400:day,lang);
      const currentRange=(await contrastPage.locator("#range-note").innerText()).replace(/\s*·\s*UTC$/,"").replace(/\s+/g," ");
      for(const id of cardIds){
-      const entries=await exportCard(contrastPage,id,{pixels:preset==="6h"});
+      const entries=await inspectCardPng(contrastPage,id,{pixels:preset==="6h"});
       const all=entries.map(e=>e.text).join(" ");
       const green=entries.filter(e=>e.color==="#b5ef58"&&e.y<100).map(e=>e.text).join(" ");
       const utcCount=(all.match(/\bUTC\b/g)||[]).length;
