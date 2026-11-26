@@ -66,3 +66,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v28 tighter preview and PNG header
 - Remove the visible close icon and its header row; retain the accessible dialog title without occupying layout, outside-tap and Escape dismissal. Green glass surface uses 48% opacity with 5px blur and 30% backdrop darkness (translucent fallback). Individual PNG removes the redundant as-of timestamp and its vertical space; centered branding and green period remain, UTC only on timed ranges. If the data is stale, keep its existing cached-data warning in the green period line only. All six card exports share this renderer. Global export and analytics unchanged.
+
+## v29 footer copy
+- Approved final cosmetic change: footer reads “Независимый дашборд сообщества Pepegun.” / “Independent Pepegun community dashboard.” Methodology, README, export disclaimers and analytics remain unchanged. Next phase: reliability, regression tests and code cleanup following the v28 audit.
