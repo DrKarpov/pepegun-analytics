@@ -174,9 +174,11 @@ export function mergeAudit(c,...candidates){
  const mismatch=checks.filter(a=>a.status==="mismatch").sort((a,b)=>b.asOf-a.asOf)[0];
  const matches=checks.filter(a=>a.status==="match"&&usable(a)).sort((a,b)=>compareLt(b.tip,a.tip)||b.asOf-a.asOf);
  const latest=checks.sort((a,b)=>b.asOf-a.asOf||compareLt(b.tip,a.tip))[0];
- if(mismatch&&!matches.some(a=>compareLt(a.tip,mismatch.tip)>=0&&a.asOf>mismatch.asOf))return mismatch;
- if(latest?.status==="match"&&!usable(latest))return matches[0]||latest;
- return latest||null;
+ // A failed attempt does not invalidate an already confirmed history prefix.
+ // A real disagreement is different: only a newer match at or beyond it clears it.
+ const confirmed=matches.filter(a=>!mismatch||(compareLt(a.tip,mismatch.tip)>=0&&a.asOf>mismatch.asOf));
+ if(mismatch&&!confirmed.length)return mismatch;
+ return confirmed[0]||latest||null;
 }
 export function validAudit(a,tip){
  return !!a&&["match","mismatch","unavailable"].includes(a.status)&&typeof a.tip==="string"&&/^\d+$/.test(a.tip)&&compareLt(a.tip,tip)<=0&&Number.isFinite(a.asOf)&&a.asOf>0&&a.asOf<=Date.now()+60000&&(a.scope===undefined||a.scope===AUDIT_SCOPE)&&(a.tipHash===undefined||(typeof a.tipHash==="string"&&hashPattern.test(a.tipHash)));
