@@ -403,7 +403,10 @@ function chartSpec(){return [
  ["fees-chart",series.bins,[{key:"fee",label:tr("fee"),color:colors.fee}],"bar",true]
 ];}
 function renderCharts(){for(const [id,data,series,kind,decimal] of chartSpec())drawChart(id,data,series,kind,decimal)}
+// A re-render replaces SVG nodes; release any in-flight gesture listeners first.
+const chartGestureCleanup=new Map();
 function drawChart(id,data,series,kind,decimal){
+ chartGestureCleanup.get(id)?.();chartGestureCleanup.delete(id);
  const root=$(id);if(!data?.length){root.innerHTML=placeholder();return}
  const W=Math.max(200,Math.round(root.clientWidth||320)),H=W<480?184:218,R=12,T=12,B=27,plotH=H-T-B;
  const val=(r,s)=>s.key==="fee"?Number(r.fee)/1e9:Number(r[s.key]||0);
@@ -436,23 +439,52 @@ function drawChart(id,data,series,kind,decimal){
  function focus(i){i=Math.max(0,Math.min(data.length-1,i));pointsState[id]=i;const r=data[i];pointBuckets[id]=i===data.length-1?null:r.bucket;cursor.setAttribute("x1",x(i));cursor.setAttribute("x2",x(i));readout.innerHTML='<strong>'+esc(intervalLabel(r))+'</strong>'+(isPartial(r)?" · "+esc(statusLabel(r.status)):"")+" · "+series.map(s=>esc(s.label)+": <strong>"+esc(s.key==="fee"?money(r.fee)+" GRAM":num(val(r,s)))+"</strong>").join(" · ")}
  const saved=pointBuckets[id];const index=saved==null?-1:data.findIndex(b=>b.bucket===saved);focus(index<0?data.length-1:index);
  root.querySelector(".chart-tx").addEventListener("click",()=>{const r=data[pointsState[id]??data.length-1];if(r)openTransactions({from:r.start,to:r.end},id==="fees-chart"?"fee":"all")});
- let activePointer=null;
+ let gesture=null;
+ const MOVE_LIMIT=8,HORIZONTAL_RATIO=1.25;
  function pointer(e){const rect=graphic.getBoundingClientRect();if(!rect.width)return;const px=(e.clientX-rect.left)*W/rect.width;const i=Math.max(0,Math.min(data.length-1,Math.floor((px-L)/cell)));if(pointsState[id]!==i)focus(i)}
+ function clearGesture(){
+  const g=gesture;if(!g)return;
+  gesture=null;g.events.abort();
+  try{if(graphic.hasPointerCapture(g.id))graphic.releasePointerCapture(g.id)}catch{}
+ }
+ chartGestureCleanup.set(id,clearGesture);
+ // Touch/pen contact starts pending. Only a deliberate horizontal drag or
+ // a short stationary tap may select; vertical/diagonal swipes are rejected.
+ function classifyGesture(e,g){
+  const dx=Math.abs(e.clientX-g.x),dy=Math.abs(e.clientY-g.y);
+  if(Math.hypot(dx,dy)<MOVE_LIMIT)return "pending";
+  return dx>=MOVE_LIMIT&&dx>dy*HORIZONTAL_RATIO?"horizontal":"rejected";
+ }
+ function cancelPointer(e){if(e.pointerId===gesture?.id)clearGesture()}
  graphic.addEventListener("pointerdown",e=>{
-  if(e.isPrimary===false||e.button!==0||activePointer!==null)return;
-  activePointer=e.pointerId;pointer(e);
+  if(e.isPrimary===false||e.button!==0||gesture)return;
+  const events=new AbortController(),g={id:e.pointerId,x:e.clientX,y:e.clientY,mode:e.pointerType==="mouse"?"mouse":"pending",events};
+  gesture=g;
+  // A second contact anywhere, native scroll, or losing the page cancels
+  // selection. These temporary listeners disappear on release or re-render.
+  const opts={signal:events.signal,passive:true,capture:true};
+  window.addEventListener("pointerdown",next=>{if(next.pointerId!==g.id)clearGesture()},opts);
+  window.addEventListener("scroll",clearGesture,opts);
+  window.addEventListener("blur",clearGesture,opts);
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)clearGesture()},opts);
+  if(g.mode==="mouse")pointer(e);
   try{graphic.setPointerCapture(e.pointerId)}catch{}
  });
  graphic.addEventListener("pointermove",e=>{
   if(e.isPrimary===false)return;
-  if(e.pointerId===activePointer||(activePointer===null&&e.pointerType==="mouse"))pointer(e);
+  const g=gesture;
+  if(!g){if(e.pointerType==="mouse")pointer(e);return}
+  if(e.pointerId!==g.id)return;
+  if(g.mode==="pending")g.mode=classifyGesture(e,g);
+  if(g.mode==="rejected"){clearGesture();return}
+  if(g.mode==="mouse"||g.mode==="horizontal")pointer(e);
  });
  graphic.addEventListener("pointerup",e=>{
-  if(e.pointerId!==activePointer)return;
-  pointer(e);activePointer=null;
-  try{if(graphic.hasPointerCapture(e.pointerId))graphic.releasePointerCapture(e.pointerId)}catch{}
+  const g=gesture;if(!g||e.pointerId!==g.id)return;
+  if(g.mode==="pending")g.mode=classifyGesture(e,g);
+  if(g.mode!=="rejected")pointer(e);
+  clearGesture();
  });
- function cancelPointer(e){if(e.pointerId===activePointer)activePointer=null}
  graphic.addEventListener("pointercancel",cancelPointer);
  graphic.addEventListener("lostpointercapture",cancelPointer);
  graphic.addEventListener("keydown",e=>{if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();focus((pointsState[id]??0)+(e.key==="ArrowRight"?1:-1))}});
