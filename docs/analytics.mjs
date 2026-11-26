@@ -313,6 +313,8 @@ async function incrementalAudit(snapshot,checkpoint,source,progress,signal){
  const txs=await download(source,checkpoint.tip,progress,signal);
  const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
  if(overlapConflict(snapshot,upto))return mismatch();
+ const knownPrefix=new Set(checkpoint.history.map(row=>row[0]));
+ if(upto.some(t=>compareLt(t.lt,checkpoint.tip)<=0&&!knownPrefix.has(t.lt)))return null;
  const anchor=txs.find(t=>t.lt===checkpoint.tip);
  const newer=txs.filter(t=>compareLt(t.lt,checkpoint.tip)>0);
  const fresh=newer.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
