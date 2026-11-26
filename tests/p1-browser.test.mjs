@@ -41,7 +41,12 @@ try{
     const original=CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText=function(...args){window.__canvasText.push(String(args[0]));return original.apply(this,args)};
    });
-   await ctx.route("https://raw.githubusercontent.com/**/snapshot.json*",route=>route.fulfill({contentType:"application/json",body:JSON.stringify(seed)}));
+   let releaseStartup,firstSeed=true;
+   const startupGate=new Promise(resolve=>releaseStartup=resolve);
+   await ctx.route("https://raw.githubusercontent.com/**/snapshot.json*",async route=>{
+    if(firstSeed){firstSeed=false;await startupGate}
+    return route.fulfill({contentType:"application/json",body:JSON.stringify(seed)});
+   });
    await ctx.route("https://toncenter.com/**",route=>{
     const u=new URL(route.request().url());
     if(mode==="mismatch")return ok(route,[tc({...fresh,prevHash:hash(99)})]);
@@ -53,9 +58,27 @@ try{
    await ctx.route("https://tonapi.io/**",route=>mode==="mismatch"||mode==="offline"?deny(route):ok(route,txs.slice().reverse().map(ta)));
    const page=await ctx.newPage(),errors=[];
    page.on("pageerror",e=>errors.push(e.message));
-   await page.goto(url);
+   await page.goto(url,{waitUntil:"domcontentloaded"});
+   const startup=page.locator("#startup-screen");
+   await startup.waitFor({state:"visible"});
+   assert.equal(await startup.evaluate(e=>getComputedStyle(e).backgroundColor),await page.locator("html").evaluate(e=>{const probe=document.createElement("div");probe.style.background="var(--raised)";e.append(probe);const result=getComputedStyle(probe).backgroundColor;probe.remove();return result}));
+   assert.equal(await startup.locator("img").getAttribute("src"),"./pepegun-logo.svg");
+   await startup.locator("img").evaluate(img=>img.decode());
+   for(const width of [320,375,393,768,1024,1440]){
+    await page.setViewportSize({width,height:900});
+    const geometry=await startup.evaluate(e=>{
+     const rect=e.getBoundingClientRect(),content=e.querySelector(".startup-content").getBoundingClientRect();
+     return {full:rect.left===0&&rect.top===0&&Math.abs(rect.width-innerWidth)<1&&Math.abs(rect.height-innerHeight)<1,center:Math.abs(content.left+content.width/2-innerWidth/2)<1&&Math.abs(content.top+content.height/2-innerHeight/2)<1,fits:content.left>=0&&content.right<=innerWidth&&content.top>=0&&content.bottom<=innerHeight};
+    });
+    assert.deepEqual(geometry,{full:true,center:true,fits:true});
+    if(width===393||width===1440)await page.screenshot({path:resolve(artifacts,name+"-startup-"+width+".png")});
+   }
+   releaseStartup();
+   await startup.waitFor({state:"detached"});
+   assert.ok(await page.evaluate(()=>performance.now()>=400));
+   assert.equal(await page.locator(".page").evaluate(e=>getComputedStyle(e).visibility),"visible");
    await page.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
-   mode="prior";await page.locator("#refresh").click();await waitStatus(page,"Earlier history checked");
+   mode="prior";await page.locator("#refresh").click();await waitStatus(page,"Earlier history checked");assert.equal(await startup.count(),0);
    mode="mismatch";await page.locator("#refresh").click();await waitStatus(page,"Sources disagree");
    assert.equal(await page.locator("#status").getAttribute("class"),"status error");
    const before=await page.locator("#overview").innerText();
@@ -98,7 +121,7 @@ try{
     try{await deny(route)}catch(error){if(!slowAudit&&!(String(error).includes("closed")||String(error).includes("aborted")||String(error).includes("already handled")))throw error}
    });
    const legacyPage=await migration.newPage();
-   await legacyPage.goto(url);await waitStatus(legacyPage,"Ожидается сверка");
+   await legacyPage.goto(url);await legacyPage.locator("#startup-screen").waitFor({state:"detached"});await waitStatus(legacyPage,"Ожидается сверка");
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    const top=await legacyPage.locator("#overview").evaluate(e=>e.getBoundingClientRect().top);
    await legacyPage.locator("#refresh").click();
@@ -125,6 +148,7 @@ try{
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    assert.equal(await legacyPage.locator("#overview").innerText(),originalMetrics);
    await legacyPage.reload();
+   await legacyPage.locator("#startup-screen").waitFor({state:"detached"});
    await legacyPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
    // A subsequent unsuccessful retry must not erase the confirmed history.
    await legacyPage.locator("#method-section summary").click();
@@ -132,9 +156,36 @@ try{
    await legacyPage.waitForFunction(()=>!document.querySelector("#audit-check").disabled&&document.querySelector("#status").className==="status "&&document.querySelector("#audit-result").textContent.includes("Второй индексатор"));
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    await migration.close();
+   // Failure and reduced-motion: normal application error must remain usable.
+   const offline=await browser.newContext({viewport:{width:393,height:852},reducedMotion:"reduce"});
+   await offline.route("**/snapshot.json*",deny);
+   await offline.route("https://toncenter.com/**",deny);
+   await offline.route("https://tonapi.io/**",deny);
+   const offlinePage=await offline.newPage();
+   await offlinePage.goto(url,{waitUntil:"domcontentloaded"});
+   await offlinePage.locator("#startup-screen").waitFor({state:"visible"});
+   assert.equal(await offlinePage.locator("#startup-screen").evaluate(e=>getComputedStyle(e).transitionDuration),"0s");
+   await offlinePage.locator("#startup-screen").waitFor({state:"detached",timeout:10000});
+   await offlinePage.waitForFunction(()=>!document.querySelector("#refresh").disabled);
+   assert.equal(await offlinePage.locator(".page").evaluate(e=>getComputedStyle(e).visibility),"visible");
+   await offline.close();
+   // Even if the app module itself fails, the presentation must fail open.
+   const broken=await browser.newContext({viewport:{width:393,height:852},reducedMotion:"reduce"});
+   await broken.route("**/app.mjs?*",route=>route.abort());
+   const brokenPage=await broken.newPage();
+   await brokenPage.goto(url,{waitUntil:"domcontentloaded"});
+   await brokenPage.locator("#startup-screen").waitFor({state:"visible"});
+   await brokenPage.locator("#startup-screen").waitFor({state:"detached",timeout:12000});
+   assert.equal(await brokenPage.locator(".page").evaluate(e=>getComputedStyle(e).visibility),"visible");
+   await broken.close();
+   const nojs=await browser.newContext({javaScriptEnabled:false});
+   const nojsPage=await nojs.newPage();await nojsPage.goto(url);
+   assert.equal(await nojsPage.locator("#startup-screen").isVisible(),false);
+   assert.equal(await nojsPage.locator(".page").isVisible(),true);
+   await nojs.close();
    assert.deepEqual(errors,[]);
    await ctx.close();
-   console.log(name,"Trust states, bilingual viewports, CSV/PNG and audit cancellation verified");
+   console.log(name,"Trust states, bilingual viewports, CSV/PNG, audit cancellation and startup screen verified");
   }finally{await browser.close()}
  }
 }finally{server.close()}

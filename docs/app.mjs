@@ -393,6 +393,7 @@ function render(){
  $("active").innerHTML='<div class="activity-title"><strong>'+esc(tr("active"))+'</strong><small>'+esc(tr("calendarWindows")+(m?" · "+utcDate(Date.parse(m.anchor+"T00:00:00Z"),true):""))+'</small></div>'+[["today","dau"],["week","wau"],["month","mau"]].map(([k,v])=>'<div class="active-stat"><strong>'+esc(m?num(m.activity[v]):"—")+'</strong><small>'+esc(tr(k))+'</small></div>').join("");
  $("finite").hidden=selected==="all"||!m;$("finite").innerHTML=m?kpi(tr("new"),num(m.newWallets),tr("firstSeen"))+kpi(tr("returning"),num(m.returning),tr("seenBefore")):"";
  renderCharts();renderDetails();renderTransactions();updateStatus();updateCardExport();
+ if(m||!busy)document.getElementById("startup-screen")?.dispatchEvent(new Event("pepegun:ready"));
 }
 const colors={all:"#b5ef58",paid:"#71c5b3",new:"#a8d956",returning:"#414f48",fee:"#a8d956",grid:"#292e2b",text:"#919c95"};
 const fnum=(x,step=1)=>new Intl.NumberFormat(locale(),{maximumFractionDigits:Math.max(0,Math.min(9,Math.ceil(-Math.log10(step))+1)),notation:x>=100000?"compact":"standard"}).format(x);
