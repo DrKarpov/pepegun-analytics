@@ -61,7 +61,7 @@ function setDates(){
  for(const id of ["from","to"]){const el=$(id);el.min=start;el.max=end;if(!el.value)el.value=id==="from"?start:end;}
 }
 function dateLabel(){if(!range||!cache)return "";const a=range.from,b=range.to-1;const label=selected==="all"?tr("all"):selected==="24h"?tr("rolling"):selected==="7d"?tr("calendar7"):selected==="30d"?tr("calendar30"):tr("dateRange");return label+" · "+dayKey(dayIndex(a))+" — "+dayKey(dayIndex(b));}
-function rangeNote(){if(!cache)return "";if(!range)return tr("badRange");const a=range.from,b=range.to-1;const sameYear=new Date(a).getUTCFullYear()===new Date(b).getUTCFullYear();const dates=selected==="24h"?utcDate(a)+" "+new Date(a).toISOString().slice(11,16)+" — "+utcDate(b,true)+" "+new Date(b).toISOString().slice(11,16):dayKey(dayIndex(a))===dayKey(dayIndex(b))?utcDate(b,true):utcDate(a,!sameYear)+" — "+utcDate(b,true);return dates+" · UTC"+(m?.anchorIncomplete?" · "+tr("shortPartial"):"");}
+function rangeNote(){if(!cache)return "";if(!range)return tr("badRange");const a=range.from,b=range.to-1;const sameYear=new Date(a).getUTCFullYear()===new Date(b).getUTCFullYear();const dates=selected==="24h"?utcDate(a)+" "+new Date(a).toISOString().slice(11,16)+" — "+utcDate(b,true)+" "+new Date(b).toISOString().slice(11,16):dayKey(dayIndex(a))===dayKey(dayIndex(b))?utcDate(b,true):utcDate(a,!sameYear)+" — "+utcDate(b,true);return dates+" · UTC";}
 function render(){
  language();setDates();
  range=cache?resolveRange(selected,cache.asOf,cache.rows[0]?.t*1000||cache.asOf,{from:$("from").value,to:$("to").value}):null;
@@ -100,6 +100,7 @@ function drawChart(id,data,series,kind,decimal){
  const ceil=Math.max(step,Math.ceil(max/step)*step),ticks=Math.round(ceil/step);
  const cell=plotW/data.length,x=i=>L+(i+.5)*cell,y=v=>T+plotH-Math.min(1,v/ceil)*plotH;
  let svg='<svg class="chart-plot" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" tabindex="0" role="img" aria-label="'+esc(tr({"growth-chart":"growth","daily-chart":"daily","fees-chart":"feesChart","weekly-chart":"weekly"}[id]))+'">';
+ svg+='<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="transparent" pointer-events="all"/>';
  for(let i=0;i<=ticks;i++){const v=i*step,py=y(v);svg+='<path d="M'+L+' '+py+'H'+(W-R)+'" stroke="'+colors.grid+'" stroke-width="1"/><text x="'+(L-5)+'" y="'+(py+4)+'" fill="'+colors.text+'" text-anchor="end" font-size="10">'+esc(fnum(v))+'</text>'}
  const tickCount=W<340?4:W<550?5:7,stepX=Math.max(1,Math.ceil((data.length-1)/(tickCount-1)));
  let idxs=[];for(let i=0;i<data.length;i+=stepX)idxs.push(i);if(idxs.at(-1)!==data.length-1){if(data.length-1-idxs.at(-1)<stepX*.55&&idxs.length>1)idxs.pop();idxs.push(data.length-1)}
@@ -121,8 +122,26 @@ function drawChart(id,data,series,kind,decimal){
  const graphic=root.querySelector("svg"),cursor=root.querySelector(".cursor"),readout=root.querySelector(".chart-readout");
  function focus(i){i=Math.max(0,Math.min(data.length-1,i));pointsState[id]=i;const r=data[i];cursor.setAttribute("x1",x(i));cursor.setAttribute("x2",x(i));readout.innerHTML='<strong>'+esc((id==="weekly-chart"?tr("weekOf")+" ":"")+r.date)+'</strong>'+(isPartial(r)?" · "+esc(statusLabel(r.status)):"")+" · "+series.map(s=>esc(s.label)+": <strong>"+esc(s.key==="fee"?fmt(r.fee,3)+" GRAM":num(val(r,s)))+"</strong>").join(" · ")}
  focus(Math.min(pointsState[id]??data.length-1,data.length-1));
- function pointer(e){const rect=graphic.getBoundingClientRect();const px=(e.clientX-rect.left)*W/rect.width;focus(Math.floor((px-L)/cell))}
- graphic.addEventListener("pointerdown",pointer);graphic.addEventListener("pointermove",e=>{if(e.pointerType==="mouse")pointer(e)});graphic.addEventListener("keydown",e=>{if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();focus((pointsState[id]??0)+(e.key==="ArrowRight"?1:-1))}});
+ let activePointer=null;
+ function pointer(e){const rect=graphic.getBoundingClientRect();if(!rect.width)return;const px=(e.clientX-rect.left)*W/rect.width;const i=Math.max(0,Math.min(data.length-1,Math.floor((px-L)/cell)));if(pointsState[id]!==i)focus(i)}
+ graphic.addEventListener("pointerdown",e=>{
+  if(e.isPrimary===false||e.button!==0||activePointer!==null)return;
+  activePointer=e.pointerId;pointer(e);
+  try{graphic.setPointerCapture(e.pointerId)}catch{}
+ });
+ graphic.addEventListener("pointermove",e=>{
+  if(e.isPrimary===false)return;
+  if(e.pointerId===activePointer||(activePointer===null&&e.pointerType==="mouse"))pointer(e);
+ });
+ graphic.addEventListener("pointerup",e=>{
+  if(e.pointerId!==activePointer)return;
+  pointer(e);activePointer=null;
+  try{if(graphic.hasPointerCapture(e.pointerId))graphic.releasePointerCapture(e.pointerId)}catch{}
+ });
+ function cancelPointer(e){if(e.pointerId===activePointer)activePointer=null}
+ graphic.addEventListener("pointercancel",cancelPointer);
+ graphic.addEventListener("lostpointercapture",cancelPointer);
+ graphic.addEventListener("keydown",e=>{if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();focus((pointsState[id]??0)+(e.key==="ArrowRight"?1:-1))}});
 }
 function table(headers,rows){return '<div class="table-wrap" tabindex="0"><table><thead><tr>'+headers.map(h=>'<th scope="col">'+esc(h)+'</th>').join("")+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(v=>'<td>'+v+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>'}
 function venueLabel(s){return s==="Unlabelled"?(lang==="ru"?"Без метки":"Unlabelled"):s}
