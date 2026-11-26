@@ -196,3 +196,5 @@ footer p{max-width:720px}
   .chart-card,.detail{padding:10px}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+
+.insight-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0 14px}.insight-actions .sub{flex:1 1 160px;overflow-wrap:anywhere}.audit-warn{color:var(--warn)}

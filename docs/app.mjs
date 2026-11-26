@@ -1,4 +1,6 @@
-import {ADDRESS,DAY,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,amount,exact,csv,sync,loadCache,saveCache} from "./analytics.mjs";
+import {ADDRESS,DAY,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,amount,exact,csv,sync,loadCache,saveCache} from "./analytics.mjs?v=4";
+import {crossCheck} from "./analytics.mjs?v=4";
+import {extraMetrics,previousRange,change,loadPrices,historicalUsd,loadSeed} from "./insights.mjs?v=4";
 
 const words={
 en:{
@@ -28,6 +30,7 @@ methodItems:[
 "Все календарные даты — UTC. Фильтры 7 и 30 дней включают день последнего снимка и 6 или 29 предыдущих дней; 24 часа — скользящий интервал. Незавершённые дни и недели отмечены. Сохранённые данные считаются только до последней успешной синхронизации.",
 "Обновление при открытии, вручную, каждые 15 минут на открытой странице и при возврате в давно открытую вкладку. Браузер хранит последнюю проверенную историю; фонового сервера и платного API нет. Доступность зависит от публичных индексаторов блокчейна."]}
 };
+const extraWords={"en":{"median":"Median fee","perPayer":"Fees per paying wallet","top5":"Top 5 share of fees","top10":"Top 10 share of fees","newPayers":"New paying wallets","repeatPayers":"Returning paying wallets","payerTrend":"New paying wallets by day","payerTrendHint":"First fee payment from each address","comparison":"Previous comparable period","compareHint":"Same elapsed UTC time in previous window; no comparison before observed history.","metric":"Metric","current":"Current","previous":"Previous","delta":"Change","noComparison":"No comparable earlier period","audit":"Source cross-check","auditButton":"Compare both indexers","auditIdle":"Not independently checked for this snapshot","auditBusy":"Checking alternate indexer…","auditMatch":"Both sources match","auditMismatch":"Sources disagree — review required","auditUnavailable":"Alternate indexer could not verify this snapshot","ambiguous":"Unclassified Pepegun comments (all time)","chainTip":"Account transaction time","usdTitle":"Historical fee value (USD)","usdHint":"Estimate using daily UTC native GRAM prices from DefiLlama; not execution prices. Missing price days are not treated as zero.","usdButton":"Load historical USD","usdLoading":"Loading prices…","usdMissing":"Missing prices for","usdUnavailable":"Historical price data unavailable","usdValue":"Estimated USD","usdCoverage":"Fee amount with price coverage","shortRules":"Only the exact Pepegun or Pepegun fee prefix (optionally 🔫), followed by a middle-dot label or end of text, is accepted. Other mentions are excluded and counted separately. Source agreement validates the indexers, not trade identity.","topHint":"Share of labelled fee revenue from the highest-paying addresses in the selected period."},"ru":{"median":"Медианная комиссия","perPayer":"Комиссии на платящий кошелёк","top5":"Доля комиссий топ-5","top10":"Доля комиссий топ-10","newPayers":"Новые платящие кошельки","repeatPayers":"Повторные платящие","payerTrend":"Новые платящие по дням","payerTrendHint":"Первый платёж комиссии каждого адреса","comparison":"Сравнение с предыдущим периодом","compareHint":"Сопоставимый интервал UTC; сравнение до начала наблюдений не проводится.","metric":"Показатель","current":"Сейчас","previous":"Ранее","delta":"Изменение","noComparison":"Нет сопоставимого предыдущего периода","audit":"Сверка источников","auditButton":"Сверить оба индексатора","auditIdle":"Этот снимок ещё не сверялся","auditBusy":"Проверка второго индексатора…","auditMatch":"Оба источника совпадают","auditMismatch":"Источники расходятся — нужна проверка","auditUnavailable":"Второй индексатор не подтвердил снимок","ambiguous":"Нетипичные комментарии Pepegun (за всё время)","chainTip":"Время последней транзакции адреса","usdTitle":"Историческая стоимость комиссий (USD)","usdHint":"Оценка по дневным котировкам нативного GRAM в UTC от DefiLlama, не цена исполнения. Отсутствующие котировки не считаются нулём.","usdButton":"Загрузить исторический USD","usdLoading":"Загрузка котировок…","usdMissing":"Нет котировок за","usdUnavailable":"Исторические котировки недоступны","usdValue":"Оценка в USD","usdCoverage":"Комиссии с доступной котировкой","shortRules":"Принимается точный префикс Pepegun или Pepegun fee (необязательно 🔫), за которым следует метка через · или конец строки. Другие упоминания исключаются и учитываются отдельно. Совпадение источников проверяет индексаторы, а не подлинность сделок.","topHint":"Доля комиссионного дохода от адресов с наибольшей суммой комиссий за выбранный период."}};Object.assign(words.en,extraWords.en);Object.assign(words.ru,extraWords.ru);
 const $=id=>document.getElementById(id);
 let lang="en";try{lang=localStorage.getItem("pepegun-lang")||(/^ru\b/i.test(navigator.language)?"ru":"en")}catch{}if(!words[lang])lang="en";
 const tr=k=>words[lang][k]||k,locale=()=>lang==="ru"?"ru-RU":"en-US",num=x=>new Intl.NumberFormat(locale()).format(x),fmt=(x,d=2)=>amount(x,d,locale()),pct=(a,b)=>b?new Intl.NumberFormat(locale(),{style:"percent",maximumFractionDigits:1}).format(a/b):"—";
@@ -38,7 +41,7 @@ const syncTime=t=>utcDate(t)+", "+new Date(t).toISOString().slice(11,16)+" UTC";
 const shortDate=s=>{const d=s.split("-");return lang==="ru"?d[2]+"."+d[1]:d[1]+"/"+d[2]};
 const statusLabel=s=>s==="partial"?tr("partial"):s==="incomplete"?tr("incomplete"):tr("complete");
 let cache=null,selected="all",m=null,range=null,busy=true,error=false,storageError=false,exportError=false,progress=null,showAll=false,resizeTimer;
-let pointsState={};
+let pointsState={},audit=null,auditing=false,priceMap=null,priceBusy=false,priceError=false,priceKey=null;
 function stale(){return !!cache&&(error||Date.now()-cache.asOf>STALE)}
 function language(){document.documentElement.lang=lang;document.querySelectorAll("[data-i]").forEach(el=>el.textContent=tr(el.dataset.i));const switchLabel=lang==="ru"?"Switch to English":"Переключить на русский";$("language").textContent=lang==="ru"?"EN":"RU";$("language").setAttribute("aria-label",switchLabel);$("language").title=switchLabel;$("refresh").setAttribute("aria-label",tr("refresh"));$("refresh").title=tr("refresh");$("filters").setAttribute("aria-label",tr("range"));$("overview").setAttribute("aria-label",tr("overview"));$("active").setAttribute("aria-label",tr("active"));}
 function updateStatus(){
@@ -99,7 +102,7 @@ function drawChart(id,data,series,kind,decimal){
  const unit=max===0?1:Math.pow(10,Math.floor(Math.log10(max/3||1))),raw=max/3/unit,step=max===0?1:Math.max(decimal?0.000001:1,(raw<=1?1:raw<=2?2:raw<=2.5?2.5:raw<=5?5:10)*unit);
  const ceil=Math.max(step,Math.ceil(max/step)*step),ticks=Math.round(ceil/step);
  const cell=plotW/data.length,x=i=>L+(i+.5)*cell,y=v=>T+plotH-Math.min(1,v/ceil)*plotH;
- let svg='<svg class="chart-plot" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" tabindex="0" role="img" aria-label="'+esc(tr({"growth-chart":"growth","daily-chart":"daily","fees-chart":"feesChart","weekly-chart":"weekly"}[id]))+'">';
+ let svg='<svg class="chart-plot" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" tabindex="0" role="img" aria-label="'+esc(tr({"growth-chart":"growth","daily-chart":"daily","fees-chart":"feesChart","weekly-chart":"weekly","payer-chart":"payerTrend"}[id]))+'">';
  svg+='<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="transparent" pointer-events="all"/>';
  for(let i=0;i<=ticks;i++){const v=i*step,py=y(v);svg+='<path d="M'+L+' '+py+'H'+(W-R)+'" stroke="'+colors.grid+'" stroke-width="1"/><text x="'+(L-5)+'" y="'+(py+4)+'" fill="'+colors.text+'" text-anchor="end" font-size="10">'+esc(fnum(v))+'</text>'}
  const tickCount=W<340?4:W<550?5:7,stepX=Math.max(1,Math.ceil((data.length-1)/(tickCount-1)));
@@ -146,17 +149,47 @@ function drawChart(id,data,series,kind,decimal){
 function table(headers,rows){return '<div class="table-wrap" tabindex="0"><table><thead><tr>'+headers.map(h=>'<th scope="col">'+esc(h)+'</th>').join("")+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(v=>'<td>'+v+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>'}
 function venueLabel(s){return s==="Unlabelled"?(lang==="ru"?"Без метки":"Unlabelled"):s}
 function renderDetails(){
- if(!m){for(const id of ["venues","advanced","retention","history"])$(id).innerHTML=placeholder();$("more").hidden=true}
+ if(!m){$("insights").hidden=true;for(const id of ["venues","advanced","retention","history"])$(id).innerHTML=placeholder();$("more").hidden=true}
  else{
  $("venues").innerHTML=m.venues.length?'<div class="venue-list">'+m.venues.map(v=>'<div class="venue-row"><div class="venue-name">'+esc(venueLabel(v.label))+'</div><div class="venue-value">'+esc(fmt(v.fee,3))+' GRAM</div><div class="venue-bar"><b style="width:'+(m.fee>0n?Number(v.fee*10000n/m.fee)/100:0)+'%"></b></div><div class="venue-meta">'+esc(num(v.wallets)+" "+tr("wallets").toLowerCase()+" · "+num(v.count)+" "+tr("payments").toLowerCase())+'</div></div>').join("")+'</div>':placeholder();
- const detail=[[tr("exactFee"),exact(m.fee)+" GRAM"],[tr("largest"),fmt(m.largest,4)+" GRAM"],[tr("other"),num(m.other)],[tr("otherValue"),fmt(m.otherValue,4)+" GRAM"],[tr("prevDay"),num(m.activity.prev)]];
+ const x=extraMetrics(cache.rows,range,cache.asOf);
+ const med=x.median2===null?"—":fmt((x.median2+1n)/2n,4)+" GRAM";
+ const detail=[[tr("exactFee"),exact(m.fee)+" GRAM"],[tr("median"),med],[tr("perPayer"),x.perPayer===null?"—":fmt(x.perPayer,4)+" GRAM"],[tr("top5"),pct(Number(x.top5),Number(x.total))],[tr("top10"),pct(Number(x.top10),Number(x.total))],[tr("newPayers"),num(x.newPayers)],[tr("repeatPayers"),num(x.repeatPayers)],[tr("largest"),fmt(m.largest,4)+" GRAM"],[tr("other"),num(m.other)],[tr("otherValue"),fmt(m.otherValue,4)+" GRAM"]];
+ $("insights").hidden=false;
+ drawChart("payer-chart",m.daily.map(d=>({...d,newPay:x.payByDay.get(d.date)||0})),[{key:"newPay",label:tr("newPayers"),color:colors.all}],"bar",false);
+ const prev=previousRange(range,cache.rows[0]?.t*1000||cache.asOf),p=prev?metrics(cache.rows,prev,cache.asOf):null;
+ const cf=(v)=>v===null?"—":new Intl.NumberFormat(locale(),{style:"percent",maximumFractionDigits:1,signDisplay:"always"}).format(v);
+ const cp=(label,a,b,format)=>[esc(label),esc(format(a)),esc(format(b)),esc(cf(change(a,b)))];
+ $("comparison").innerHTML=p?'<p class="sub">'+esc(dayKey(dayIndex(prev.from))+" — "+dayKey(dayIndex(prev.to-1)))+'</p>'+table([tr("metric"),tr("current"),tr("previous"),tr("delta")],[cp(tr("wallets"),m.wallets,p.wallets,num),cp(tr("paying"),m.paying,p.paying,num),cp(tr("revenue"),m.fee,p.fee,v=>fmt(v)),cp(tr("payments"),m.count,p.count,num)]):placeholder(tr("noComparison"));
  $("advanced").innerHTML='<div class="advanced-grid">'+detail.map(([k,v])=>'<div><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div>';
  const len=Math.max(0,...m.retention.map(x=>x.active.length));
  $("retention").innerHTML=len?table([tr("cohort"),tr("size"),...Array.from({length:len},(_,i)=>"W"+i)],m.retention.map(c=>[esc(c.date),esc(num(c.size)),...Array.from({length:len},(_,i)=>c.active[i]===undefined?"—":'<span title="'+esc(num(c.active[i])+" / "+num(c.size))+'" style="color:'+(c.active[i]?"#b5ef58":"#a1ada3")+'">'+esc(pct(c.active[i],c.size))+(m.currentWeekPartial&&i===c.active.length-1?"*":"")+"</span>")])):placeholder();
  const rows=[...m.daily].reverse();$("history").innerHTML=rows.length?table([tr("day"),tr("activeShort"),tr("newShort"),tr("returningShort"),tr("payingShort"),tr("count"),tr("fee")+" (GRAM)",tr("other"),tr("cum"),tr("cumPay")],(showAll?rows:rows.slice(0,14)).map(d=>[esc(d.date)+(d.status==="complete"?"":'<div class="date-status">'+esc(statusLabel(d.status))+'</div>'),...([d.active,d.new,d.returning,d.paying,d.count].map(x=>esc(num(x)))),esc(fmt(d.fee,3)),esc(num(d.other)),esc(num(d.cum)),esc(num(d.cumPay))])):placeholder();
  $("more").hidden=rows.length<=14;$("more").textContent=tr(showAll?"less":"more");
  }
- const items=tr("methodItems");$("method").innerHTML='<ul class="method-list">'+items.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><div class="method-facts">'+esc(tr("collector"))+': <a href="https://tonviewer.com/'+ADDRESS+'" target="_blank" rel="noopener noreferrer">'+ADDRESS+'</a>'+(cache?'<br>'+esc(tr("provider")+": "+(cache.source==="toncenter"?"Toncenter API v3":"TonAPI v2"))+'<br>'+esc(tr("scanned")+": "+num(cache.scanned))+'<br>'+esc(tr("coverage")+": "+tr("verified")):'')+'</div>';
+ renderExtras();const items=[...tr("methodItems"),tr("shortRules")];$("method").innerHTML='<ul class="method-list">'+items.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><div class="method-facts">'+esc(tr("collector"))+': <a href="https://tonviewer.com/'+ADDRESS+'" target="_blank" rel="noopener noreferrer">'+ADDRESS+'</a>'+(cache?'<br>'+esc(tr("provider")+": "+(cache.source==="toncenter"?"Toncenter API v3":"TonAPI v2"))+'<br>'+esc(tr("scanned")+": "+num(cache.scanned))+'<br>'+esc(tr("coverage")+": "+tr("verified")):'')+'</div>';
+}
+function renderExtras(){
+ const key=range?dayIndex(range.from)+":"+dayIndex(range.to-1):null;
+ const auditState=auditing?"auditBusy":audit&&cache&&audit.tip===cache.tip?({match:"auditMatch",mismatch:"auditMismatch",unavailable:"auditUnavailable"}[audit.status]||"auditIdle"):"auditIdle";
+ $("audit-result").textContent=tr(auditState)+(audit&&!auditing&&cache&&audit.tip===cache.tip?" · "+time(audit.asOf):"");
+ $("audit-result").className="sub "+(auditState==="auditMismatch"?"audit-warn":"");
+ $("audit-check").disabled=!cache||auditing;
+ $("audit-check").textContent=tr("auditButton");
+ $("audit-meta").textContent=cache?tr("ambiguous")+": "+num(cache.ambiguous)+" · "+tr("chainTip")+": "+time(cache.tipTime*1000):"";
+ $("usd-load").disabled=!m||priceBusy;$("usd-load").textContent=tr(priceBusy?"usdLoading":"usdButton");
+ let msg="";if(m&&priceMap&&priceKey===key){const u=historicalUsd(cache.rows,range,priceMap);msg=u.total===null?tr("usdMissing")+" "+num(u.missing.length)+(lang==="ru"?" дн.":" days")+" · "+tr("usdCoverage")+": "+pct(Number(u.covered),Number(u.all)):tr("usdValue")+": "+new Intl.NumberFormat(locale(),{style:"currency",currency:"USD",maximumFractionDigits:2}).format(u.total)}
+ else if(priceError&&priceKey===key)msg=tr("usdUnavailable");
+ $("usd-result").textContent=msg;
+}
+async function auditSources(){
+ if(!cache||auditing)return;const snapshot=cache;auditing=true;renderExtras();
+ try{audit=await crossCheck(snapshot)}catch{audit={status:"unavailable",asOf:Date.now(),tip:snapshot.tip}}
+ finally{auditing=false;renderExtras()}
+}
+async function getUsd(){
+ if(!m||priceBusy)return;const r={...range},key=dayIndex(r.from)+":"+dayIndex(r.to-1);priceBusy=true;priceError=false;priceKey=key;priceMap=null;renderExtras();
+ try{priceMap=await loadPrices(r.from,r.to)}catch{priceError=true}finally{priceBusy=false;renderExtras()}
 }
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
 function exportCsv(){
@@ -202,8 +235,8 @@ $("language").addEventListener("click",()=>{lang=lang==="ru"?"en":"ru";try{local
 document.querySelectorAll("[data-range]").forEach(b=>b.addEventListener("click",()=>{selected=b.dataset.range;showAll=false;pointsState={};render()}));
 for(const id of ["from","to"])$(id).addEventListener("change",()=>{pointsState={};showAll=false;render()});
 $("more").addEventListener("click",()=>{showAll=!showAll;renderDetails()});
-$("refresh").addEventListener("click",()=>refresh());$("resync").addEventListener("click",()=>refresh(true));$("csv").addEventListener("click",exportCsv);$("png").addEventListener("click",()=>{exportError=false;updateStatus();exportPng().catch(()=>{exportError=true;updateStatus()})});
-window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(renderCharts,100)});
+$("audit-check").addEventListener("click",auditSources);$("usd-load").addEventListener("click",getUsd);$("refresh").addEventListener("click",()=>refresh());$("resync").addEventListener("click",()=>refresh(true));$("csv").addEventListener("click",exportCsv);$("png").addEventListener("click",()=>{exportError=false;updateStatus();exportPng().catch(()=>{exportError=true;updateStatus()})});
+window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{renderCharts();if(m&&$("insights").closest("details").open)renderDetails()},100)});$("insights").closest("details").addEventListener("toggle",()=>{if(m&&$("insights").closest("details").open)renderDetails()});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!busy&&(!cache||Date.now()-cache.asOf>=REFRESH))refresh()});
 setInterval(()=>{if(!busy&&document.visibilityState==="visible")refresh()},REFRESH);setInterval(updateStatus,60000);
-render();loadCache().then(c=>{cache=c;busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});
+render();loadCache().then(async c=>{cache=c||await loadSeed();busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});

@@ -1,6 +1,6 @@
 export const ADDRESS="UQD-J5lB6VMC1Cyyz2bLEEflmiG0JRXv7fccO6olayRRqWrc";
 export const RAW="0:fe279941e95302d42cb2cf66cb1047e59a21b42515efedf71c3baa256b2451a9";
-export const DAY=86400000, REFRESH=900000, STALE=1200000, VERSION=2;
+export const DAY=86400000, REFRESH=900000, STALE=1200000, VERSION=3;
 export const dayIndex=t=>Math.floor(t/DAY);
 export const dayKey=d=>new Date(d*DAY).toISOString().slice(0,10);
 export const weekIndex=d=>Math.floor((d+3)/7);
@@ -23,10 +23,15 @@ export function mapTx(x,source){
  const success=tc?!aborted:!aborted&&x.success;
  return {h:hex(x.hash),lt,prev,t,success,m};
 }
+export function commentKind(comment){
+ if(typeof comment!=="string"||!comment.toLowerCase().includes("pepegun"))return null;
+ const match=comment.trim().match(/^(?:🔫\uFE0F?\s*)?Pepegun(?:\s+(fee))?(?:\s*·\s*([^·\r\n]+)(?:\s*·[^\r\n]*)?)?$/iu);
+ return match?{k:match[1]?"fee":"other",d:match[2]?.trim().slice(0,64)||"Unlabelled"}:{k:"ambiguous"};
+}
 export function classify(tx){
- const m=tx.m;if(!m?.c||!m.c.toLowerCase().includes("pepegun"))return null;
+ const m=tx.m,kind=commentKind(m?.c);if(!kind||kind.k==="ambiguous")return null;
  if(!tx.success||m.b||!m.s||m.s===RAW||BigInt(m.v)<=0n)return null;
- return {h:tx.h,lt:tx.lt,t:tx.t,s:m.s,v:m.v,k:m.c.toLowerCase().includes("pepegun fee")?"fee":"other",d:m.c.split("·")[1]?.trim().slice(0,64)||"Unlabelled"};
+ return {h:tx.h,lt:tx.lt,t:tx.t,s:m.s,v:m.v,k:kind.k,d:kind.d};
 }
 export function ordered(txs){const m=new Map();for(const t of txs)m.set(t.h,t);return [...m.values()].sort((a,b)=>compareLt(a.lt,b.lt))}
 export function verify(txs,prev){if(!txs.length)return false;let p=prev;for(const tx of txs){if(tx.prev!==p||compareLt(tx.lt,p)<=0)return false;p=tx.lt}return true}
@@ -60,7 +65,7 @@ async function getPage(source,cursor,after,size,progress){
  if(!Array.isArray(data?.transactions))throw Error("Invalid transactions response");
  return data.transactions.map(t=>mapTx(t,source));
 }
-async function download(source,after,progress){
+export async function download(source,after,progress){
  const {size,delay}=settings[source],m=new Map();let cursor=null,pages=0;
  for(;;){
   const page=await getPage(source,cursor,after,size,progress);let added=0,oldest=null;
@@ -72,11 +77,11 @@ async function download(source,after,progress){
  }
  return ordered([...m.values()]);
 }
-function validCache(c){return !!c&&c.version===VERSION&&c.address===RAW&&Array.isArray(c.rows)&&typeof c.tip==="string"&&/^\d+$/.test(c.tip)&&Number.isFinite(c.asOf)&&Number.isInteger(c.scanned)&&c.scanned>0}
+function validCache(c){return !!c&&c.version===VERSION&&c.address===RAW&&Array.isArray(c.rows)&&typeof c.tip==="string"&&/^\d+$/.test(c.tip)&&Number.isFinite(c.asOf)&&Number.isInteger(c.scanned)&&c.scanned>0&&typeof c.tipHash==="string"&&/^[0-9a-f]{64}$/.test(c.tipHash)&&Number.isFinite(c.tipTime)&&Number.isFinite(c.firstTime)}
 export function cacheFrom(txs,source,previous=null,now=Date.now()){
  const m=new Map((previous?.rows||[]).map(r=>[r.h,r]));
  for(const tx of txs){const r=classify(tx);if(r)m.set(r.h,r)}
- return {version:VERSION,address:RAW,source,tip:txs.at(-1)?.lt||previous?.tip,asOf:now,scanned:(previous?.scanned||0)+txs.length,rows:[...m.values()].sort((a,b)=>a.t-b.t||compareLt(a.lt,b.lt))};
+ return {version:VERSION,address:RAW,source,tip:txs.at(-1)?.lt||previous?.tip,tipHash:txs.at(-1)?.h||previous?.tipHash,tipTime:txs.at(-1)?.t||previous?.tipTime,firstTime:previous?.firstTime??txs[0]?.t,asOf:now,scanned:(previous?.scanned||0)+txs.length,ambiguous:(previous?.ambiguous||0)+txs.filter(t=>commentKind(t.m?.c)?.k==="ambiguous"&&t.success&&t.m?.s&&t.m.s!==RAW&&!t.m.b&&BigInt(t.m.v)>0n).length,rows:[...m.values()].sort((a,b)=>a.t-b.t||compareLt(a.lt,b.lt))};
 }
 export async function sync(previous,progress,force=false){
  let last;
@@ -87,11 +92,12 @@ export async function sync(previous,progress,force=false){
     if(fresh.length&&verify(fresh,previous.tip))return cacheFrom(fresh,source,previous);
     if(!fresh.length){
      const head=await getPage(source,null,null,1,progress);
-     if(head.length===1&&head[0].lt===previous.tip)return cacheFrom([],source,previous);
+     if(head.length===1&&head[0].lt===previous.tip&&head[0].h===previous.tipHash)return cacheFrom([],source,previous);
     }
    }
    const txs=await download(source,null,progress);
    if(!verify(txs,"0"))throw Error("Incomplete or empty full history");
+   if(validCache(previous)&&compareLt(txs.at(-1).lt,previous.tip)<0)throw Error("Indexer behind last verified snapshot");
    return cacheFrom(txs,source);
   }catch(e){last=e}
  }
@@ -144,6 +150,19 @@ export function metrics(rows,range,now){
  for(const [s,ws] of walletWeeks){const w=weekIndex(dayIndex(first.get(s)));if(!cohorts.has(w))cohorts.set(w,[]);cohorts.get(w).push(ws)}
  const retention=[...cohorts.entries()].sort((a,b)=>b[0]-a[0]).slice(0,12).map(([w,members])=>({date:dayKey(weekStart(w)),size:members.length,active:Array.from({length:Math.min(9,last-w+1)},(_,i)=>members.filter(s=>s.has(w+i)).length)}));
  return {wallets:all.active.size,paying:all.paying.size,newWallets,returning:all.active.size-newWallets,fee:all.fee,count:all.count,other:all.other,otherValue:all.otherValue,largest:all.largest,daily,weekly,venues:[...venues].map(([label,a])=>({label,fee:a.fee,count:a.count,other:a.other,wallets:a.active.size,paying:a.paying.size})).sort((a,b)=>a.fee>b.fee?-1:a.fee<b.fee?1:0),activity:Object.fromEntries(Object.entries(activity).map(([k,v])=>[k,v.size])),anchor:dayKey(anchor),anchorIncomplete:(anchor+1)*DAY>now,retention,currentWeekPartial:weekStart(last)*DAY+7*DAY>to};
+}
+export function compareSnapshots(snapshot,other){
+ const byHash=new Map(other.rows.map(r=>[r.h,r]));
+ return snapshot.tip===other.tip&&snapshot.tipHash===other.tipHash&&snapshot.scanned===other.scanned&&snapshot.ambiguous===other.ambiguous&&snapshot.rows.length===other.rows.length&&!snapshot.rows.some(r=>{const a=byHash.get(r.h);return !a||["lt","t","s","v","k","d"].some(k=>r[k]!==a[k])});
+}
+export async function crossCheck(snapshot,progress){
+ if(!validCache(snapshot))throw Error("No verified snapshot");
+ const source=snapshot.source==="toncenter"?"tonapi":"toncenter";
+ const txs=await download(source,null,progress);
+ const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
+ if(!verify(upto,"0")||upto.at(-1)?.lt!==snapshot.tip)return {status:"unavailable",source,asOf:Date.now(),tip:snapshot.tip};
+ const other=cacheFrom(upto,source,null,snapshot.asOf);
+ return {status:compareSnapshots(snapshot,other)?"match":"mismatch",source,asOf:Date.now(),tip:snapshot.tip,scanned:other.scanned,rows:other.rows.length};
 }
 export function exact(n){const q=BigInt(n),s=q<0n?"-":"",v=q<0n?-q:q;return s+(v/1000000000n)+"."+(v%1000000000n).toString().padStart(9,"0")}
 export function amount(n,digits=2,locale="en"){const f=10n**BigInt(9-digits),q=(BigInt(n)+f/2n)/f,p=10n**BigInt(digits);return new Intl.NumberFormat(locale,{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(Number(q)/Number(p))}
