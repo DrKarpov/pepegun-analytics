@@ -143,4 +143,66 @@ try{
  await assert.rejects(()=>crossCheck(c),/HTTP 403/);
  assert.equal(JSON.stringify(c),beforeAudit);
 }finally{globalThis.fetch=originalFetch}
-console.log("P1 integrity and P2 cancellation regression checks passed");
+// P2-03: checkpoint must be created by a full audit, bind every prefix row,
+// preserve ambiguous totals, and fall back when it cannot prove continuity.
+try{
+ install(()=>[...t].reverse());
+ const confirmed=await crossCheck(c);
+ assert.equal(confirmed.status,"match");
+ assert.equal(confirmed.method,"full");
+ assert.match(confirmed.proof.digest,/^[0-9a-f]{64}$/);
+ const checkpoint={...c,audit:confirmed};
+ install(u=>{assert.equal(u.searchParams.get("limit"),"1");return [t[2]]});
+ const same=await crossCheck(c,undefined,{checkpoint});
+ assert.equal(same.status,"match");assert.equal(same.method,"incremental");assert.equal(requests.length,1);
+ assert.equal(same.proof.fullAt,confirmed.proof.fullAt);
+ const tail={h:hash(4),lt:"4",prev:"3",prevHash:hash(3),t:104,success:true,m:null};
+ const extended=cacheFrom([tail],"toncenter",c);
+ install(u=>{assert.equal(u.searchParams.get("after_lt"),"3");return [tail]});
+ const extension=await crossCheck(extended,undefined,{checkpoint});
+ assert.equal(extension.status,"match");assert.equal(extension.method,"incremental");assert.equal(requests.length,1);
+ // Inclusive lower bound also works, even when successor prev hash is absent.
+ install(()=>[{...tail,prevHash:undefined},t[2]]);
+ assert.equal((await crossCheck(extended,undefined,{checkpoint})).method,"incremental");
+ // Alternate head ahead of unchanged published tip: independently link successor.
+ install(u=>u.searchParams.has("after_lt")?[tail]:[tail]);
+ assert.equal((await crossCheck(c,undefined,{checkpoint})).method,"incremental");
+ assert.equal(requests.length,2);
+ // Incomplete proof, old proof, corrupted digest, changed prefix, wrong source.
+ for(const invalid of [
+  {...checkpoint,audit:{...confirmed,proof:undefined}},
+  {...checkpoint,audit:{...confirmed,proof:{...confirmed.proof,fullAt:Date.now()-8*86400000}}},
+  {...checkpoint,audit:{...confirmed,proof:{...confirmed.proof,digest:hash(99)}}},
+  {...checkpoint,audit:{...confirmed,source:"toncenter"}},
+  {...checkpoint,ambiguous:1},
+  {...checkpoint,history:[checkpoint.history[0],["2",hash(9)],checkpoint.history[2]]}
+ ]){
+  install(u=>{assert.equal(u.searchParams.has("after_lt"),false);return [...t].reverse()});
+  const result=await crossCheck(c,undefined,{checkpoint:invalid});
+  assert.equal(result.method,"full");assert.equal(result.status,"match");assert.equal(requests.length,1);
+ }
+ // Missing successor linkage: fall back to a complete independent audit.
+ install(u=>u.searchParams.has("after_lt")?[{...tail,prevHash:undefined}]:[tail,...t.slice().reverse()]);
+ const fallback=await crossCheck(extended,undefined,{checkpoint});
+ assert.equal(fallback.method,"full");assert.equal(fallback.status,"match");assert.equal(requests.length,2);
+ // A known conflicting hash or predecessor must never produce match.
+ install(()=>[{...tail,h:hash(9)}]);
+ assert.equal((await crossCheck(extended,undefined,{checkpoint})).status,"mismatch");
+ install(()=>[{...tail,prevHash:hash(9)}]);
+ assert.equal((await crossCheck(extended,undefined,{checkpoint})).status,"mismatch");
+ // Provider returns a complete anchored tail with classification disagreement.
+ const different={...tail,m:{s:"0:"+hash(500),v:"100",b:false,c:"Pepegun fee · STON.fi"}};
+ const expected=cacheFrom([different],"toncenter",c);
+ install(()=>[tail]);
+ assert.equal((await crossCheck(expected,undefined,{checkpoint})).status,"mismatch");
+ // Explicit/manual full check never takes the shortcut.
+ install(u=>{assert.equal(u.searchParams.has("after_lt"),false);return [...t].reverse()});
+ assert.equal((await crossCheck(checkpoint)).method,"full");
+ // A cancellation cannot silently switch to a full scan.
+ const ac=new AbortController();let calls=0;
+ globalThis.fetch=(...args)=>{calls++;return pendingFetch(...args)};
+ const work=crossCheck(extended,undefined,{checkpoint,signal:ac.signal});
+ setTimeout(()=>ac.abort(),10);
+ await assert.rejects(work,e=>e.name==="AbortError");assert.ok(calls<=1);
+}finally{globalThis.fetch=originalFetch}
+console.log("P1 integrity, P2 cancellation and checkpoint regression checks passed");
