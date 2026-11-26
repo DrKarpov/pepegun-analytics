@@ -80,12 +80,13 @@ export async function renderCardPng(s){
 }
 export function setupCardExport(getMeta,download){
  const dialog=document.getElementById("card-export-menu"),hint=document.getElementById("card-export-hint"),title=document.getElementById("card-export-title"),save=document.getElementById("card-export-download"),share=document.getElementById("card-export-share"),cancel=document.getElementById("card-export-cancel"),status=document.getElementById("card-export-status"),preview=document.getElementById("card-export-preview"),previewFrame=document.getElementById("card-export-preview-frame"),actions=document.getElementById("card-export-actions");
- const cards=[...document.querySelectorAll("[data-card-export]")];let press=null,timer=0,serial=0,ready=null,origin=null,previewUrl=null,closing=false;
+ const cards=[...document.querySelectorAll("[data-card-export]")];let press=null,feedbackTimer=0,timer=0,serial=0,ready=null,origin=null,previewUrl=null,closing=false,lastPointerType="";
+ const FEEDBACK_DELAY=240,HOLD_DELAY=600,MOVE_LIMIT=8;
  const root=document.documentElement;
  const setInput=mode=>{root.dataset.inputMode=mode};setInput("pointer");
- document.addEventListener("pointerdown",()=>setInput("pointer"),true);
+ document.addEventListener("pointerdown",e=>{setInput("pointer");lastPointerType=e.pointerType||"mouse"},true);
  document.addEventListener("keydown",e=>{if(["Tab","Enter"," ","Escape","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","ContextMenu","F10"].includes(e.key))setInput("keyboard")},true);
- const stop=()=>{clearTimeout(timer);timer=0;press?.card.classList.remove("export-holding");press=null};
+ const stop=()=>{clearTimeout(feedbackTimer);clearTimeout(timer);feedbackTimer=timer=0;press?.card.classList.remove("export-holding");press=null};
  const clearHold=()=>{stop();for(const card of cards)card.classList.remove("export-holding")};
  const excluded=target=>!!target.closest("button,a,input,select,textarea,.chart-plot");
  const clearPreview=()=>{previewFrame.hidden=true;preview.width=1;preview.height=1;preview.removeAttribute("aria-label");if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null}};
@@ -114,13 +115,19 @@ export function setupCardExport(getMeta,download){
   }catch{if(token===serial&&dialog.open&&!closing){clearPreview();status.textContent=L.failed}}
  }
  for(const card of cards){
-  card.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"||e.isPrimary===false||e.button!==0||excluded(e.target)||!getMeta().valid||dialog.open)return;stop();press={id:e.pointerId,x:e.clientX,y:e.clientY,card};card.classList.add("export-holding");timer=setTimeout(()=>{if(press?.card===card)open(card)},600)});
-  card.addEventListener("contextmenu",e=>{if(!getMeta().valid||excluded(e.target))return;e.preventDefault();if(press||e.pointerType==="touch"||e.pointerType==="pen"||e.sourceCapabilities?.firesTouchEvents)return;open(card)});
+  card.addEventListener("pointerdown",e=>{
+   if(e.pointerType==="mouse"||e.isPrimary===false||e.button!==0||excluded(e.target)||!getMeta().valid||dialog.open||closing)return;
+   stop();const attempt={id:e.pointerId,x:e.clientX,y:e.clientY,card};press=attempt;
+   feedbackTimer=setTimeout(()=>{if(press===attempt&&!dialog.open&&!closing&&getMeta().valid&&!card.hidden)card.classList.add("export-holding")},FEEDBACK_DELAY);
+   timer=setTimeout(()=>{if(press===attempt)open(card)},HOLD_DELAY);
+  });
+  card.addEventListener("contextmenu",e=>{if(!getMeta().valid||excluded(e.target))return;e.preventDefault();if(press||e.pointerType==="touch"||e.pointerType==="pen"||e.sourceCapabilities?.firesTouchEvents||(!e.pointerType&&["touch","pen"].includes(lastPointerType)))return;open(card)});
   card.addEventListener("keydown",e=>{if(e.target!==card)return;if(e.key==="ContextMenu"||(e.shiftKey&&e.key==="F10")||e.key==="Enter"){e.preventDefault();open(card,true)}});
  }
- window.addEventListener("pointermove",e=>{if(press&&e.pointerId===press.id&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>9)stop()},{passive:true});
+ window.addEventListener("pointermove",e=>{if(press&&e.pointerId===press.id&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>=MOVE_LIMIT)stop()},{passive:true});
  for(const event of ["pointerup","pointercancel","scroll","blur"])window.addEventListener(event,stop,{passive:true,capture:true});
  window.addEventListener("pointerdown",e=>{if(e.isPrimary===false)stop()},{passive:true});
+ document.addEventListener("visibilitychange",()=>{if(document.hidden)stop()});
  save.addEventListener("click",()=>{if(ready){download(ready.blob,ready.name);close()}});
  share.addEventListener("click",async()=>{if(!ready?.file)return;const s=ready;try{await navigator.share({files:[s.file]});close()}catch(e){if(e.name!=="AbortError"&&ready===s)status.textContent=s.L.shareFailed}});
  previewFrame.addEventListener("contextmenu",e=>e.preventDefault());previewFrame.addEventListener("dragstart",e=>e.preventDefault());

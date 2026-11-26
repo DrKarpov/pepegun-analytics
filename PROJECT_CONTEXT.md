@@ -57,3 +57,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v25 share without caption
 - Native sharing passes only the PNG file (no title, text or URL). Branding is already embedded in the image. Download behavior unchanged.
+
+## v26 scroll-safe long press
+- Touch feedback starts only after 240ms stationary contact, export still opens after 600ms total. Movement of 8 CSS pixels or more, scrolling, release, cancellation, secondary pointers, window blur and hidden document cancel pending feedback and export. Touch-generated contextmenu cannot bypass the delay. Desktop and keyboard export unchanged.
