@@ -121,7 +121,7 @@ try{
     try{await deny(route)}catch(error){if(!slowAudit&&!(String(error).includes("closed")||String(error).includes("aborted")||String(error).includes("already handled")))throw error}
    });
    const legacyPage=await migration.newPage();
-   await legacyPage.goto(url);await waitStatus(legacyPage,"Ожидается сверка");
+   await legacyPage.goto(url);await legacyPage.locator("#startup-screen").waitFor({state:"detached"});await waitStatus(legacyPage,"Ожидается сверка");
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    const top=await legacyPage.locator("#overview").evaluate(e=>e.getBoundingClientRect().top);
    await legacyPage.locator("#refresh").click();
@@ -148,6 +148,7 @@ try{
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    assert.equal(await legacyPage.locator("#overview").innerText(),originalMetrics);
    await legacyPage.reload();
+   await legacyPage.locator("#startup-screen").waitFor({state:"detached"});
    await legacyPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
    // A subsequent unsuccessful retry must not erase the confirmed history.
    await legacyPage.locator("#method-section summary").click();
