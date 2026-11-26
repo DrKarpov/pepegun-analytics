@@ -22,6 +22,15 @@ const common={hash:hash(2),lt:"2",prev_trans_lt:"1",prev_trans_hash:hash(1)};
 assert.equal(mapTx({...common,account:RAW,now:102,description:{aborted:false}},"toncenter").prevHash,hash(1));
 assert.equal(mapTx({...common,account:{address:RAW},utime:102,aborted:false,success:true},"tonapi").prevHash,hash(1));
 assert.throws(()=>mapTx({...common,prev_trans_lt:undefined,account:{address:RAW},utime:102,aborted:false,success:true},"tonapi"));
+// TonAPI really omits both fields on the first account transaction (observed in live CI).
+const genesisRaw={account:{address:RAW},hash:hash(1),lt:"1",utime:101,aborted:true,success:true};
+const genesis=mapTx(genesisRaw,"tonapi");
+assert.equal(genesis.prev,"0");assert.equal(genesis.prevHash,null);
+assert.equal(genesis.success,false);
+assert.ok(verify([genesis,t[1],t[2]],"0"));
+assert.equal(verify([t[0],mapTx({...genesisRaw,hash:hash(2),lt:"2"},"tonapi"),t[2]],"0"),false);
+assert.equal(verify([mapTx({...genesisRaw,hash:hash(2),lt:"2"},"tonapi")],"1",hash(1)),false);
+assert.throws(()=>mapTx({account:RAW,hash:hash(1),lt:"1",now:101,description:{aborted:true}},"toncenter"));
 // Network fixtures: exercise sync without downloading live data.
 const apiTx=x=>({account:RAW,hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,now:x.t,description:{aborted:false}});
 const tonapiTx=x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true});
