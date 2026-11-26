@@ -7,8 +7,8 @@ Goal: strengthen reliability and maintainability without redesigning the approve
 ## Status and resume pointer
 
 - Cosmetic phase v29: complete. P1 and P2-01/02 merged, tested with real complete history and both browsers. Recovery of the erroneous unavailable status merged in d6c8042; user confirmed “Обновлено” on the live site. Automatic snapshot generation subsequently published a full match (5ebb7f9 and f261e52). Startup presentation outside roadmap merged in 2f9a5b3 after CI 45889000113; production rendering not independently checked.
-- Progress: 11 / 15 implemented and verified in main. All four P3 tasks have candidate implementations in one branch; no completion claim before CI and merge.
-- Resume: P3 combined branch work/p3-final, checkpoint 054a56ad314a80ce43970638cdd697f9f022b792. P3-04 pinned baseline browser comparisons, P3-01 conservative CSS consolidation, P3-02 i18n/chart/palette/global PNG extraction, P3-03 README/handoff. Verify existing suites and new comparisons, address any actual failures, then squash merge and record final evidence/status in docs. Native iOS acceptance and production deployment are separate.
+- Progress: 15 / 15 DONE (100%). All roadmap implementations verified and merged to main.
+- Final release: [5bb3cab](https://github.com/drkarpov/pepegun-analytics/commit/5bb3cab798fad94ef2dcbdb8ac85ae74cfeda712), PR #11, [CI 45898705630](https://github.com/drkarpov/pepegun-analytics/actions/runs/45898705630) successful. No remaining roadmap implementation task. Next: confirm deployed Pages and native iOS acceptance separately; maintain snapshot and monitor regressions.
 - State vocabulary: TODO, IN PROGRESS, BLOCKED, VERIFIED (branch), DONE (main + verification). A code change without required tests is not DONE.
 
 ## Stage 1 — P1: data reliability (4/4)
@@ -36,14 +36,14 @@ Stage gate: evidence-backed source contracts, migration and failure handling, me
 
 Stage gate: source integrity retained, no paid infrastructure, no visual redesign, tested failure paths and key interactions; actual browser checks or explicit blocker.
 
-## Stage 3 — P3: maintainability (0/4)
+## Stage 3 — P3: maintainability (4/4)
 
 | ID | Task | Acceptance criteria | Dependencies | Status |
 |---|---|---|---|---|
-| P3-01 | Consolidate CSS | Remove redundant overrides in small batches; compare baseline desktop/mobile RU/EN and modal/hold states; no layout regressions. | P3-04 baseline tests recommended first | IN PROGRESS |
-| P3-02 | Modularize app.mjs | Separate coherent concerns with clear dependencies, retain all features and exact calculations, safe cache-busting/versioned imports. | P3-04 baseline tests recommended first | IN PROGRESS |
-| P3-03 | Maintain README and context | Accurate setup, architecture, methodology, operational commands, current statuses and limitations. Update throughout, finalize after changes. | All relevant changes | IN PROGRESS |
-| P3-04 | Add automated browser tests | Repeatable Chromium and available WebKit checks for core flows, both languages, narrow/desktop screens, preview and download, gesture/failure states; document native iOS limits. | Start baseline coverage before visual/refactor changes | IN PROGRESS |
+| P3-01 | Consolidate CSS | Remove redundant overrides in small batches; compare baseline desktop/mobile RU/EN and modal/hold states; no layout regressions. | P3-04 baseline tests recommended first | DONE |
+| P3-02 | Modularize app.mjs | Separate coherent concerns with clear dependencies, retain all features and exact calculations, safe cache-busting/versioned imports. | P3-04 baseline tests recommended first | DONE |
+| P3-03 | Maintain README and context | Accurate setup, architecture, methodology, operational commands, current statuses and limitations. Update throughout, finalize after changes. | All relevant changes | DONE |
+| P3-04 | Add automated browser tests | Repeatable Chromium and available WebKit checks for core flows, both languages, narrow/desktop screens, preview and download, gesture/failure states; document native iOS limits. | Start baseline coverage before visual/refactor changes | DONE |
 
 Test infrastructure can be introduced earlier to protect P1/P2. Stage numbering is priority, not a prohibition on prerequisite tests. Do not do unrelated cleanup in an integrity change.
 
@@ -90,6 +90,8 @@ Test infrastructure can be introduced earlier to protect P1/P2. Stage numbering 
 | 2026-11-26 | P3-01 CSS consolidation | [eebbea2](https://github.com/drkarpov/pepegun-analytics/commit/eebbea231497f45384e83ce7d5b4b380f0b07bce) | Removed 1106 characters of superseded declarations and duplicate preview rules; retained breakpoint and fallback order. | CI baseline comparison pending; deliberately conservative, not a redesign. |
 | 2026-11-26 | P3-02 focused modules | [43b6750](https://github.com/drkarpov/pepegun-analytics/commit/43b67500df5af39151d0798d1a96c8a731cfe374), [a5da781](https://github.com/drkarpov/pepegun-analytics/commit/a5da7816d607b971f59973cc2215ef3253073915) | Extracted i18n, SVG renderer with private selection/gesture state, shared chart palette and global PNG renderer. app.mjs shrunk from 51876 to about 21300 characters. No analytics/schema changes. Version v39. | CI pending. |
 | 2026-11-26 | P3-03 documentation | [054a56a](https://github.com/drkarpov/pepegun-analytics/commit/054a56ad314a80ce43970638cdd697f9f022b792) | README architecture, data definitions, CSP, commands, comparison and device limits refreshed. | Candidate handoff updated; finalize verification status after successful CI/merge. |
+
+| 2026-11-26 | P3 verified and merged — roadmap complete | [5bb3cab](https://github.com/drkarpov/pepegun-analytics/commit/5bb3cab798fad94ef2dcbdb8ac85ae74cfeda712) | [CI 45898705630](https://github.com/drkarpov/pepegun-analytics/actions/runs/45898705630) passed on first run: all Node suites, full live 3738/3446, incremental 2 vs 38 alternate requests, existing Chromium/WebKit regressions, CSP enforcement, 24 fixed-history baseline combinations with equal visible text/SVG/geometry/computed styles, screenshot tolerance gate, exact CSV bytes and decoded global + six individual PNG pixels, modal and hold presentation, simulated clipboard denial. | All 15 DONE. Native iOS Safari/system share/permission dialogs and Pages deployment not independently verified. No new infrastructure, data/schema changes or redesign. |
 
 After each work unit add an entry with exact commit, changed files or linked diff, tests actually executed and their results, blockers, and next action. Update status and resume pointer in the same commit where practical. If a task is only proposed, leave it TODO. Keep previous entries. See DEVELOPMENT_RULES.md.
 
