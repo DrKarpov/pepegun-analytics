@@ -92,10 +92,15 @@ assert.equal(auditTrust({...c,audit:{status:"match",tip:c.tip,asOf:match.asOf}})
 assert.equal(auditTrust({...c,audit:match}),"match");
 assert.equal(auditTrust({...c,audit:mismatch}),"mismatch");
 assert.equal(mergeAudit({...c,audit:mismatch},unavailable).status,"mismatch");
+// A later network failure cannot erase a valid independent confirmation.
+assert.equal(mergeAudit({...c,audit:match},unavailable).status,"match");
+assert.equal(mergeAudit({...c,audit:unavailable},match).status,"match");
+assert.equal(mergeAudit({...c,audit:mismatch},{...match,asOf:Date.now()-1500},{...unavailable,asOf:Date.now()-1000}).status,"match");
 assert.equal(mergeAudit({...c,audit:mismatch},match).status,"mismatch");
 assert.equal(mergeAudit({...c,audit:mismatch},{...match,asOf:Date.now()-1000}).status,"match");
 const advanced=cacheFrom([{h:hash(4),lt:"4",prev:"3",prevHash:hash(3),t:104,success:true,m:null}],"toncenter",c);
 assert.equal(auditTrust({...advanced,audit:match}),"prior");
+assert.equal(auditTrust({...advanced,audit:mergeAudit(advanced,match,auditResult(advanced,"unavailable"))}),"prior");
 assert.equal(auditTrust({...advanced,audit:mergeAudit(advanced,mismatch)}),"mismatch");
 assert.equal(auditTrust({...c,audit:{...match,tipHash:hash(9)}}),"unchecked");
 assert.equal(historyConflict(c,advanced),false);
