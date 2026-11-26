@@ -7,8 +7,8 @@ Goal: strengthen reliability and maintainability without redesigning the approve
 ## Status and resume pointer
 
 - Cosmetic phase v29: complete. P1 and P2-01/02 merged, tested with real complete history and both browsers. Recovery of the erroneous unavailable status merged in d6c8042; user confirmed “Обновлено” on the live site. Automatic snapshot generation subsequently published a full match (5ebb7f9 and f261e52). Startup presentation outside roadmap merged in 2f9a5b3 after CI 45889000113; production rendering not independently checked.
-- Progress: 8 / 15 implemented and verified; 7 remain (browser coverage for P3-04 partially implemented).
-- Next: P2-05 in work/p2-05-contrast, code/test checkpoint a15ec7418dd06f24174c189a86655f7e4d21ead9. Returning-wallet bars/legend use #607367 in live SVG, individual PNG and global PNG; 3.46:1 against #171a18 (formerly 2.04:1), incomplete returning bars retain 0.92 opacity to reach 3.13:1. Complete returning vs live new-wallet lime 3.07:1. Other colors/opacity unchanged; contrast target concerns returning series against chart card, not every partially transparent adjacent series. Actual PNG pixel-count and SVG checks in both languages and browsers, plus existing regressions, pending CI. Then P2-06. Preserve approved UI and metrics.
+- Progress: 9 / 15 implemented and verified; 6 remain (browser coverage for P3-04 partially implemented).
+- Next: P2-06 in work/p2-06-export-labels. Code/tests checkpoint c6707d33b081b32153ae9a4f233cc9d49b171693. Individual PNGs omit routine verified/prior-history status; actual mismatch, unavailable/unchecked and stale warnings remain on a separate amber line. Green line is period only, with active card anchored at range-end calendar date. Single UTC beside a clock, none for date-only card. Site trust status, global PNG and CSV unchanged. Browser CI pending; then P2-07.
 - State vocabulary: TODO, IN PROGRESS, BLOCKED, VERIFIED (branch), DONE (main + verification). A code change without required tests is not DONE.
 
 ## Stage 1 — P1: data reliability (4/4)
@@ -22,7 +22,7 @@ Goal: strengthen reliability and maintainability without redesigning the approve
 
 Stage gate: evidence-backed source contracts, migration and failure handling, metric reconciliation against a fixed snapshot, reviewed diff, successful CI and documented residual limitations. Do not publish a new schema that breaks existing deployed clients.
 
-## Stage 2 — P2: performance, resilience, UX, security (4/7)
+## Stage 2 — P2: performance, resilience, UX, security (5/7)
 
 | ID | Task | Acceptance criteria | Dependencies | Status |
 |---|---|---|---|---|
@@ -30,8 +30,8 @@ Stage gate: evidence-backed source contracts, migration and failure handling, me
 | P2-02 | Add overall deadline and audit cancel | Abort propagates through network, retry and pagination; no stale busy state, no lost cache, clear cancelled/unavailable status; tests for offline, timeout and cancellation. | P1 | DONE |
 | P2-03 | Optimize repeated indexer checks | Incremental verification from an agreed checkpoint, full fallback and manual full audit; no weakened integrity, respect API limits. | P1-01/03, P2-02 | DONE |
 | P2-04 | Prevent accidental chart selection while scrolling | Vertical swipe does not select a point; intentional tap/drag, mouse and keyboard still work; long press export unaffected. | Stage 1 gate | DONE |
-| P2-05 | Improve returning-wallet graph contrast | At least 3:1 on relevant adjacent background, same restrained palette; consistency on live chart and both exports. | Stage 1 gate | IN PROGRESS |
-| P2-06 | Clarify PNG time and activity scopes | All six cards RU/EN: accurate range/anchor; UTC once beside actual time where necessary, never beside date-only label; no timestamp/footer restoration; preview equals PNG. | Stage 1 gate | TODO |
+| P2-05 | Improve returning-wallet graph contrast | At least 3:1 on relevant adjacent background, same restrained palette; consistency on live chart and both exports. | Stage 1 gate | DONE |
+| P2-06 | Clarify PNG time and activity scopes | All six individual cards RU/EN: accurate range/anchor; UTC once beside actual time, never beside date-only label; omit routine prior-history status; retain material trust/stale warnings separately; no timestamp/footer restoration; preview equals PNG. | Stage 1 gate | IN PROGRESS |
 | P2-07 | Add CSP | Restrict resource/network origins, maintain required API and snapshot fallback, canvas/SVG/blob exports, inline dynamic style compatibility; verify in browser. | Stage 1 gate | TODO |
 
 Stage gate: source integrity retained, no paid infrastructure, no visual redesign, tested failure paths and key interactions; actual browser checks or explicit blocker.
@@ -83,3 +83,6 @@ Test infrastructure can be introduced earlier to protect P1/P2. Stage numbering 
 | 2026-11-26 | P2-05 candidate | [a15ec74](https://github.com/drkarpov/pepegun-analytics/commit/a15ec7418dd06f24174c189a86655f7e4d21ead9) | Computed returning contrast 3.46:1 opaque, 3.13:1 composited incomplete vs card; 3.07:1 opaque against live new-wallet lime. Added deterministic repeated-wallet fixtures and SVG/actual global and individual PNG pixel checks RU/EN. CI pending. | Single shared returning shade and returning-only partial opacity. No unrelated CSS/modal/metric changes. App cache v37. |
 
 After each work unit add an entry with exact commit, changed files or linked diff, tests actually executed and their results, blockers, and next action. Update status and resume pointer in the same commit where practical. If a task is only proposed, leave it TODO. Keep previous entries. See DEVELOPMENT_RULES.md.
+
+| 2026-11-26 | P2-05 verified and merged | 301e60f8dc26f71ac78420dea40cf6590c343754 | CI 45893505664 passed Node, full/incremental audit, Chromium/WebKit contrast and PNG tests. Initial test fixture corrected in 9e2e781. | DONE. |
+| 2026-11-26 | P2-06 implementation | c6707d33b081b32153ae9a4f233cc9d49b171693 | App/export v38; added Node label and browser all-card regressions for both languages, rolling/calendar/custom range, preview equality. CI pending. | User requested removing prior-history text from individual PNG. Keep actual warnings separately in amber. Global export unchanged. |
