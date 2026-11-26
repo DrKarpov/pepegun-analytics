@@ -1,6 +1,6 @@
 import {setupCardExport} from "./card-export.mjs?v=30";
-import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=31";
-import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=31";
+import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=32";
+import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=32";
 const words={
   "en": {
     "subtitle": "Independent on-chain analytics",
@@ -119,6 +119,9 @@ const words={
     "auditButton": "Compare both indexers",
     "auditIdle": "Not independently checked for this snapshot",
     "auditBusy": "Checking alternate indexer…",
+    "auditCancel": "Cancel cross-check",
+    "auditCancelled": "Cross-check cancelled",
+    "auditTimeout": "Cross-check timed out",
     "auditPages": "Pages downloaded",
     "auditScanned": "Transactions scanned",
     "auditRetry": "Retrying request…",
@@ -279,6 +282,9 @@ const words={
     "auditButton": "Сверить оба индексатора",
     "auditIdle": "Этот снимок ещё не сверялся",
     "auditBusy": "Проверка второго индексатора…",
+    "auditCancel": "Отменить сверку",
+    "auditCancelled": "Сверка отменена",
+    "auditTimeout": "Время сверки истекло",
     "auditPages": "Загружено страниц",
     "auditScanned": "Просмотрено транзакций",
     "auditRetry": "Повторный запрос…",
@@ -341,7 +347,7 @@ function intervalLabel(b){const a=b.start,z=b.end-1;if(hourly())return utcDate(a
 function exportDateLabel(){return range?(selected==="6h"||selected==="24h"?time(range.from)+" — "+time(range.to-1):dateLabel()+" · UTC"):""}
 const statusLabel=s=>s==="partial"?tr("partial"):s==="incomplete"?tr("incomplete"):tr("complete");
 let cache=null,selected="all",m=null,range=null,busy=true,error=false,storageError=false,exportError=false,progress=null,resizeTimer;
-let pointsState={},pointBuckets={},auditing=false,auditProgress=null,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
+let pointsState={},pointBuckets={},auditing=false,auditController=null,auditOutcome=null,auditProgress=null,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
 const trustLabel=(trust=auditTrust(cache))=>({mismatch:"trustMismatch",prior:"trustPrior",unavailable:"trustUnavailable",unchecked:"trustUnchecked"}[trust]);
 function stale(){return !!cache&&(error||Date.now()-cache.asOf>STALE)}
 function language(){document.documentElement.lang=lang;document.querySelectorAll("[data-i]").forEach(el=>el.textContent=tr(el.dataset.i));const switchLabel=lang==="ru"?"Switch to English":"Переключить на русский";$("language").textContent=lang==="ru"?"EN":"RU";$("language").setAttribute("aria-label",switchLabel);$("language").title=switchLabel;$("refresh").setAttribute("aria-label",tr("refresh"));$("refresh").title=tr("refresh");$("filters").setAttribute("aria-label",tr("range"));$("tx-filters").setAttribute("aria-label",lang==="ru"?"Тип транзакции":"Transaction type");$("overview").setAttribute("aria-label",tr("overview"));$("active").setAttribute("aria-label",tr("active"));}
@@ -491,22 +497,27 @@ $("method").addEventListener("click",event=>{const button=event.target.closest("
 function renderExtras(){
  const check=cache?.audit,trust=auditTrust(cache);
  const state=auditing&&trust!=="mismatch"?"auditBusy":({match:"auditMatch",prior:"auditMatch",mismatch:"auditMismatch",unavailable:"auditUnavailable",unchecked:"auditIdle"}[trust]);
- $("audit-result").textContent=tr(state)+(check&&!auditing?" · "+time(check.asOf)+(cache&&check.tip!==cache.tip?" · "+tr("auditPrior"):""):"");
+ $("audit-result").textContent=tr(state)+(check&&!auditing?" · "+time(check.asOf)+(cache&&check.tip!==cache.tip?" · "+tr("auditPrior"):""):"")+(!auditing&&auditOutcome?" · "+tr(auditOutcome):"");
  $("audit-result").className="sub "+(state==="auditMismatch"?"audit-warn":"");
- const auditButton=$("audit-check");auditButton.disabled=!cache||auditing;auditButton.classList.toggle("audit-running",auditing);auditButton.setAttribute("aria-busy",String(auditing));auditButton.textContent=tr(auditing?"auditBusy":"auditButton");
+ const auditButton=$("audit-check");auditButton.disabled=!cache||Boolean(auditing&&auditController?.signal.aborted);auditButton.classList.toggle("audit-running",auditing);auditButton.setAttribute("aria-busy",String(auditing));auditButton.textContent=tr(auditing?"auditCancel":"auditButton");
  const p=auditProgress;
  $("audit-progress").hidden=!auditing;
  $("audit-progress").textContent=auditing&&p?((p.source==="tonapi"?"TonAPI v2":"Toncenter API v3")+" · "+tr("auditPages")+": "+num(p.pages)+" · "+tr("auditScanned")+": "+num(p.scanned)+(p.retry?" · "+tr("auditRetry"):"")):"";
  $("audit-meta").textContent=cache?tr("ambiguous")+": "+num(cache.ambiguous)+" · "+tr("chainTip")+": "+time(cache.tipTime*1000):"";
 }
 async function auditSources(){
- if(!cache||auditing)return;
- const snapshot=cache;auditing=true;auditProgress={source:snapshot.source==="toncenter"?"tonapi":"toncenter",pages:0,scanned:0,retry:false};renderExtras();
+ if(auditing){auditController?.abort();renderExtras();return}
+ if(!cache)return;
+ const snapshot=cache,controller=new AbortController();auditController=controller;auditing=true;auditOutcome=null;auditProgress={source:snapshot.source==="toncenter"?"tonapi":"toncenter",pages:0,scanned:0,retry:false};renderExtras();
  let result;
- try{result=await crossCheck(snapshot,p=>{auditProgress={...auditProgress,...p,retry:!!p.retry};renderExtras()})}catch{result=auditResult(snapshot,"unavailable")}
- finally{
-  if(cache){cache={...cache,audit:mergeAudit(cache,result)};updateStatus();await saveCache(cache)}
-  auditing=false;auditProgress=null;renderExtras();updateStatus();
+ try{result=await crossCheck(snapshot,p=>{auditProgress={...auditProgress,...p,retry:!!p.retry};renderExtras()},{signal:controller.signal})}
+ catch(e){
+  if(controller.signal.aborted)auditOutcome="auditCancelled";
+  else{if(e.name==="TimeoutError")auditOutcome="auditTimeout";result=auditResult(snapshot,"unavailable")}
+ }finally{
+  if(cache&&result)cache={...cache,audit:mergeAudit(cache,result)};
+  auditing=false;auditController=null;auditProgress=null;renderExtras();updateStatus();
+  if(cache&&result)await saveCache(cache);
  }
 }
 function renderTransactions(){

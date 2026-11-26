@@ -1,4 +1,4 @@
-import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,validAudit,validCache,auditTrust,mergeAudit,historyConflict,exact,weekIndex,weekStart} from "./analytics.mjs?v=31";
+import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,validAudit,validCache,auditTrust,mergeAudit,historyConflict,exact,weekIndex,weekStart} from "./analytics.mjs?v=32";
 export function extraMetrics(rows,range,now){
  const to=Math.min(range.to,now+1),from=range.from,firstPay=new Map(),feeValues=[],byWallet=new Map(),newPayers=new Set();let total=0n;
  for(const r of rows){const t=r.t*1000;if(t>=to||r.k!=="fee")continue;if(!firstPay.has(r.s)||firstPay.get(r.s)>t)firstPay.set(r.s,t);if(t<from)continue;const v=BigInt(r.v);feeValues.push(v);total+=v;byWallet.set(r.s,(byWallet.get(r.s)||0n)+v);}

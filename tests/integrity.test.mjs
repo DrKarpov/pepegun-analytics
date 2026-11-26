@@ -22,6 +22,15 @@ const common={hash:hash(2),lt:"2",prev_trans_lt:"1",prev_trans_hash:hash(1)};
 assert.equal(mapTx({...common,account:RAW,now:102,description:{aborted:false}},"toncenter").prevHash,hash(1));
 assert.equal(mapTx({...common,account:{address:RAW},utime:102,aborted:false,success:true},"tonapi").prevHash,hash(1));
 assert.throws(()=>mapTx({...common,prev_trans_lt:undefined,account:{address:RAW},utime:102,aborted:false,success:true},"tonapi"));
+// TonAPI really omits both fields on the first account transaction (observed in live CI).
+const genesisRaw={account:{address:RAW},hash:hash(1),lt:"1",utime:101,aborted:true,success:true};
+const genesis=mapTx(genesisRaw,"tonapi");
+assert.equal(genesis.prev,"0");assert.equal(genesis.prevHash,null);
+assert.equal(genesis.success,false);
+assert.ok(verify([genesis,t[1],t[2]],"0"));
+assert.equal(verify([t[0],mapTx({...genesisRaw,hash:hash(2),lt:"2"},"tonapi"),t[2]],"0"),false);
+assert.equal(verify([mapTx({...genesisRaw,hash:hash(2),lt:"2"},"tonapi")],"1",hash(1)),false);
+assert.throws(()=>mapTx({account:RAW,hash:hash(1),lt:"1",now:101,description:{aborted:true}},"toncenter"));
 // Network fixtures: exercise sync without downloading live data.
 const apiTx=x=>({account:RAW,hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,now:x.t,description:{aborted:false}});
 const tonapiTx=x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true});
@@ -91,4 +100,42 @@ assert.equal(auditTrust({...advanced,audit:mergeAudit(advanced,mismatch)}),"mism
 assert.equal(auditTrust({...c,audit:{...match,tipHash:hash(9)}}),"unchecked");
 assert.equal(historyConflict(c,advanced),false);
 assert.equal(historyConflict(c,cacheFrom(changed,"tonapi")),true);
-console.log("P1 identity regression checks passed");
+// P2-02: cancellation and overall deadline apply to every network phase.
+const beforeAudit=JSON.stringify(c);
+const pendingFetch=(_,options)=>new Promise((resolve,reject)=>{
+ const signal=options.signal;
+ if(signal.aborted)reject(signal.reason);
+ else signal.addEventListener("abort",()=>reject(signal.reason),{once:true});
+});
+try{
+ let calls=0;
+ globalThis.fetch=(...args)=>{calls++;return pendingFetch(...args)};
+ const pre=new AbortController();pre.abort();
+ await assert.rejects(()=>crossCheck(c,undefined,{signal:pre.signal}),e=>e.name==="AbortError");
+ assert.equal(calls,0);
+ const active=new AbortController(),inFlight=crossCheck(c,undefined,{signal:active.signal});
+ active.abort();
+ await assert.rejects(inFlight,e=>e.name==="AbortError");
+ assert.equal(calls,1);
+ calls=0;
+ await assert.rejects(()=>crossCheck(c,undefined,{timeoutMs:15}),e=>e.name==="TimeoutError");
+ assert.equal(calls,1);
+ // Abort during a rate-limit retry wait, without issuing another request.
+ calls=0;
+ globalThis.fetch=async()=>{calls++;return {ok:false,status:429,headers:new Headers({"Retry-After":"1"})}};
+ const retry=new AbortController();
+ await assert.rejects(()=>crossCheck(c,p=>{if(p.retry)setTimeout(()=>retry.abort(),10)},{signal:retry.signal}),e=>e.name==="AbortError");
+ assert.equal(calls,1);
+ // Abort during the gap between two history pages.
+ calls=0;
+ const page=Array.from({length:100},(_,i)=>({h:hash(i+1),lt:String(i+1),prev:String(i),prevHash:hash(i),t:101+i,success:true,m:null})).reverse();
+ globalThis.fetch=async()=>{calls++;return {ok:true,json:async()=>({transactions:page.map(tonapiTx)})}};
+ const pagination=new AbortController();
+ await assert.rejects(()=>crossCheck(c,p=>{if(p.pages===1)setTimeout(()=>pagination.abort(),10)},{signal:pagination.signal}),e=>e.name==="AbortError");
+ assert.equal(calls,1);
+ // An actual permanent provider failure is not confused with cancellation.
+ globalThis.fetch=async()=>({ok:false,status:403});
+ await assert.rejects(()=>crossCheck(c),/HTTP 403/);
+ assert.equal(JSON.stringify(c),beforeAudit);
+}finally{globalThis.fetch=originalFetch}
+console.log("P1 integrity and P2 cancellation regression checks passed");

@@ -18,7 +18,12 @@ export function mapTx(x,source){
  const im=x.in_msg,decoded=tc?im?.message_content?.decoded:im?.decoded_body;
  const isText=tc?(decoded?.type==="text_comment"||decoded?.["@type"]==="text_comment"):im?.decoded_op_name==="text_comment";
  const comment=isText?(tc?decoded?.comment:decoded?.text):null;
- const lt=unsigned(x.lt),prev=unsigned(x.prev_trans_lt);
+ // TonAPI omits both predecessor fields for the first account transaction.
+ // Treat that exact shape as the genesis sentinel; verify() still rejects it
+ // anywhere except the beginning of a complete chain. A half-missing link
+ // must not be silently accepted as genesis.
+ const genesis=!tc&&x.prev_trans_lt==null&&x.prev_trans_hash==null;
+ const lt=unsigned(x.lt),prev=genesis?"0":unsigned(x.prev_trans_lt);
  const prevHash=x.prev_trans_hash==null?null:hex(x.prev_trans_hash);
  const m=im?{s:raw(tc?im.source:im.source?.address),v:im.value==null?"0":unsigned(im.value),b:im.bounced===true,c:typeof comment==="string"?comment:null}:null;
  const success=tc?!aborted:!aborted&&x.success;
@@ -82,19 +87,36 @@ function overlapConflict(previous,txs){
  return txs.some(t=>{const row=known.get(t.lt);return !!row&&(row.h!==t.h||(row.prev!==null&&t.prev!==row.prev)||(row.prevHash!==null&&t.prevHash!=null&&t.prevHash!==row.prevHash))});
 }
 
-const wait=ms=>new Promise(r=>setTimeout(r,ms));
-async function json(url,progress){
+export const AUDIT_TIMEOUT=240000;
+const abortReason=signal=>signal?.reason??new DOMException("Aborted","AbortError");
+function checkAbort(signal){if(signal?.aborted)throw abortReason(signal)}
+function wait(ms,signal){
+ checkAbort(signal);
+ return new Promise((resolve,reject)=>{
+  const finish=()=>{signal?.removeEventListener("abort",cancel);resolve()};
+  const cancel=()=>{clearTimeout(timer);signal?.removeEventListener("abort",cancel);reject(abortReason(signal))};
+  const timer=setTimeout(finish,ms);
+  signal?.addEventListener("abort",cancel,{once:true});
+ });
+}
+async function json(url,progress,signal){
  let last;
  for(let i=0;i<5;i++){
-  const ac=new AbortController(),timer=setTimeout(()=>ac.abort(),20000);
+  checkAbort(signal);
+  const ac=new AbortController(),forward=()=>ac.abort(abortReason(signal));
+  signal?.addEventListener("abort",forward,{once:true});
+  const timer=setTimeout(()=>ac.abort(new DOMException("Request timed out","TimeoutError")),20000);
+  let delay=1000*2**i;
   try{
    const r=await fetch(url,{signal:ac.signal,cache:"no-store"});
-   if(r.ok)return await r.json();
+   checkAbort(signal);
+   if(r.ok){const data=await r.json();checkAbort(signal);return data}
    if(r.status!==429&&r.status<500)throw Object.assign(Error("HTTP "+r.status),{permanent:true});
    const ra=Number(r.headers.get("Retry-After"));last=Error("HTTP "+r.status);
-   if(i<4){const delay=Math.min(30000,ra>0?ra*1000:1000*2**i);progress?.({retry:true});await wait(delay)}
-  }catch(e){last=e;if(e.permanent)throw e;if(i<4){progress?.({retry:true});await wait(1000*2**i)}}
-  finally{clearTimeout(timer)}
+   delay=Math.min(30000,ra>0?ra*1000:delay);
+  }catch(e){checkAbort(signal);last=e;if(e.permanent)throw e}
+  finally{clearTimeout(timer);signal?.removeEventListener("abort",forward)}
+  if(i<4){checkAbort(signal);progress?.({retry:true});await wait(delay,signal)}
  }
  throw last||Error("API unavailable");
 }
@@ -107,15 +129,16 @@ function pageUrl(source,cursor,after,size){
  if(after)u.searchParams.set(tc?"start_lt":"after_lt",after);
  return u.href;
 }
-async function getPage(source,cursor,after,size,progress){
- const data=await json(pageUrl(source,cursor,after,size),progress);
+async function getPage(source,cursor,after,size,progress,signal){
+ const data=await json(pageUrl(source,cursor,after,size),progress,signal);
  if(!Array.isArray(data?.transactions))throw Error("Invalid transactions response");
  return data.transactions.map(t=>mapTx(t,source));
 }
-export async function download(source,after,progress){
+export async function download(source,after,progress,signal){
  const {size,delay}=settings[source],m=new Map();let cursor=null,pages=0;
  for(;;){
-  const page=await getPage(source,cursor,after,size,progress);let added=0,oldest=null;
+  checkAbort(signal);
+  const page=await getPage(source,cursor,after,size,progress,signal);let added=0,oldest=null;
   for(const t of page){
    const prior=m.get(t.h);
    if(prior){if(JSON.stringify(prior)!==JSON.stringify(t))throw Error("Conflicting duplicate transaction")}
@@ -123,9 +146,10 @@ export async function download(source,after,progress){
    if(oldest===null||compareLt(t.lt,oldest)<0)oldest=t.lt;
   }
   progress?.({source,pages:++pages,scanned:m.size});
+  checkAbort(signal);
   if(page.length<size)break;
   if(!added||!oldest||(cursor&&compareLt(oldest,cursor)>=0))throw Error("Pagination stopped advancing");
-  cursor=oldest;await wait(delay);
+  cursor=oldest;await wait(delay,signal);
  }
  return ordered([...m.values()]);
 }
@@ -245,16 +269,24 @@ export function compareSnapshots(snapshot,other){
  const byHash=new Map(other.rows.map(r=>[r.h,r]));
  return sameHistory(snapshot.history,other.history)&&snapshot.tip===other.tip&&snapshot.tipHash===other.tipHash&&snapshot.scanned===other.scanned&&snapshot.ambiguous===other.ambiguous&&snapshot.rows.length===other.rows.length&&!snapshot.rows.some(r=>{const a=byHash.get(r.h);return !a||["lt","t","s","v","k","d"].some(k=>r[k]!==a[k])});
 }
-export async function crossCheck(snapshot,progress){
+export async function crossCheck(snapshot,progress,{signal,timeoutMs=AUDIT_TIMEOUT}={}){
+ checkAbort(signal);
  if(!validCache(snapshot))throw Error("No verified snapshot");
+ if(!Number.isFinite(timeoutMs)||timeoutMs<=0)throw Error("Invalid audit timeout");
  const source=snapshot.source==="toncenter"?"tonapi":"toncenter";
  if(!snapshot.history)return auditResult(snapshot,"unavailable",{source});
- const txs=await download(source,null,progress);
- const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
- if(overlapConflict(snapshot,upto))return auditResult(snapshot,"mismatch",{source});
- if(!verify(upto,"0")||upto.at(-1)?.lt!==snapshot.tip)return auditResult(snapshot,"unavailable",{source});
- const other=cacheFrom(upto,source,null,snapshot.asOf);
- return auditResult(snapshot,compareSnapshots(snapshot,other)?"match":"mismatch",{source,scanned:other.scanned,rows:other.rows.length});
+ const controller=new AbortController(),forward=()=>controller.abort(abortReason(signal));
+ signal?.addEventListener("abort",forward,{once:true});
+ const timer=setTimeout(()=>controller.abort(new DOMException("Audit timed out","TimeoutError")),timeoutMs);
+ try{
+  const txs=await download(source,null,progress,controller.signal);
+  checkAbort(controller.signal);
+  const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
+  if(overlapConflict(snapshot,upto))return auditResult(snapshot,"mismatch",{source});
+  if(!verify(upto,"0")||upto.at(-1)?.lt!==snapshot.tip)return auditResult(snapshot,"unavailable",{source});
+  const other=cacheFrom(upto,source,null,snapshot.asOf);
+  return auditResult(snapshot,compareSnapshots(snapshot,other)?"match":"mismatch",{source,scanned:other.scanned,rows:other.rows.length});
+ }finally{clearTimeout(timer);signal?.removeEventListener("abort",forward)}
 }
 export function exact(n){const q=BigInt(n),s=q<0n?"-":"",v=q<0n?-q:q;return s+(v/1000000000n)+"."+(v%1000000000n).toString().padStart(9,"0")}
 export function amount(n,digits=2,locale="en",trim=false){

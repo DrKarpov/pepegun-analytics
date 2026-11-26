@@ -37,6 +37,8 @@ jobs:
           node tests/snapshot.test.mjs
       - name: Verify live provider samples (read-only)
         run: node scripts/check-providers.mjs
+      - name: Diagnose full provider history (read-only)
+        run: node scripts/check-full-history.mjs
       - name: Install browser test tools
         run: |
           npm install --no-save --no-package-lock --ignore-scripts playwright@1.51.1

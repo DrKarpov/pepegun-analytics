@@ -92,7 +92,11 @@ try{
     const u=new URL(route.request().url());
     return ok(route,u.searchParams.has("start_lt")?[]:u.searchParams.get("limit")==="1"?[tc(txs.at(-1))]:txs.slice().reverse().map(tc));
    });
-   await migration.route("https://tonapi.io/**",deny);
+   let slowAudit=true;
+   await migration.route("https://tonapi.io/**",async route=>{
+    if(slowAudit)await new Promise(resolve=>setTimeout(resolve,2000));
+    try{await deny(route)}catch(error){if(!slowAudit&&!(String(error).includes("closed")||String(error).includes("aborted")||String(error).includes("already handled")))throw error}
+   });
    const legacyPage=await migration.newPage();
    await legacyPage.goto(url);await waitStatus(legacyPage,"Ожидается сверка");
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
@@ -102,12 +106,21 @@ try{
    await waitStatus(legacyPage,"Ожидается сверка");
    assert.equal(await legacyPage.locator("#overview").evaluate(e=>e.getBoundingClientRect().top),top);
    await legacyPage.locator("#method-section summary").click();
+   const originalMetrics=await legacyPage.locator("#overview").innerText();
+   await legacyPage.locator("#audit-check").click();
+   await legacyPage.getByRole("button",{name:"Отменить сверку",exact:true}).click();
+   await legacyPage.waitForFunction(()=>document.querySelector("#audit-result").textContent.includes("Сверка отменена")&&!document.querySelector("#audit-check").disabled);
+   await waitStatus(legacyPage,"Ожидается сверка");
+   assert.equal(await legacyPage.locator("#audit-progress").isVisible(),false);
+   assert.equal(await legacyPage.locator("#notice").isVisible(),false);
+   assert.equal(await legacyPage.locator("#overview").innerText(),originalMetrics);
+   slowAudit=false;
    await legacyPage.locator("#audit-check").click();await waitStatus(legacyPage,"Сверка недоступна");
    assert.equal(await legacyPage.locator("#notice").isVisible(),false);
    await migration.close();
    assert.deepEqual(errors,[]);
    await ctx.close();
-   console.log(name,"P1 trust states, bilingual viewports, CSV and PNG verified");
+   console.log(name,"Trust states, bilingual viewports, CSV/PNG and audit cancellation verified");
   }finally{await browser.close()}
  }
 }finally{server.close()}
