@@ -91,4 +91,42 @@ assert.equal(auditTrust({...advanced,audit:mergeAudit(advanced,mismatch)}),"mism
 assert.equal(auditTrust({...c,audit:{...match,tipHash:hash(9)}}),"unchecked");
 assert.equal(historyConflict(c,advanced),false);
 assert.equal(historyConflict(c,cacheFrom(changed,"tonapi")),true);
-console.log("P1 identity regression checks passed");
+// P2-02: cancellation and overall deadline apply to every network phase.
+const beforeAudit=JSON.stringify(c);
+const pendingFetch=(_,options)=>new Promise((resolve,reject)=>{
+ const signal=options.signal;
+ if(signal.aborted)reject(signal.reason);
+ else signal.addEventListener("abort",()=>reject(signal.reason),{once:true});
+});
+try{
+ let calls=0;
+ globalThis.fetch=(...args)=>{calls++;return pendingFetch(...args)};
+ const pre=new AbortController();pre.abort();
+ await assert.rejects(()=>crossCheck(c,undefined,{signal:pre.signal}),e=>e.name==="AbortError");
+ assert.equal(calls,0);
+ const active=new AbortController(),inFlight=crossCheck(c,undefined,{signal:active.signal});
+ active.abort();
+ await assert.rejects(inFlight,e=>e.name==="AbortError");
+ assert.equal(calls,1);
+ calls=0;
+ await assert.rejects(()=>crossCheck(c,undefined,{timeoutMs:15}),e=>e.name==="TimeoutError");
+ assert.equal(calls,1);
+ // Abort during a rate-limit retry wait, without issuing another request.
+ calls=0;
+ globalThis.fetch=async()=>{calls++;return {ok:false,status:429,headers:new Headers({"Retry-After":"1"})}};
+ const retry=new AbortController();
+ await assert.rejects(()=>crossCheck(c,p=>{if(p.retry)setTimeout(()=>retry.abort(),10)},{signal:retry.signal}),e=>e.name==="AbortError");
+ assert.equal(calls,1);
+ // Abort during the gap between two history pages.
+ calls=0;
+ const page=Array.from({length:100},(_,i)=>({h:hash(i+1),lt:String(i+1),prev:String(i),prevHash:hash(i),t:101+i,success:true,m:null})).reverse();
+ globalThis.fetch=async()=>{calls++;return {ok:true,json:async()=>({transactions:page.map(tonapiTx)})}};
+ const pagination=new AbortController();
+ await assert.rejects(()=>crossCheck(c,p=>{if(p.pages===1)setTimeout(()=>pagination.abort(),10)},{signal:pagination.signal}),e=>e.name==="AbortError");
+ assert.equal(calls,1);
+ // An actual permanent provider failure is not confused with cancellation.
+ globalThis.fetch=async()=>({ok:false,status:403});
+ await assert.rejects(()=>crossCheck(c),/HTTP 403/);
+ assert.equal(JSON.stringify(c),beforeAudit);
+}finally{globalThis.fetch=originalFetch}
+console.log("P1 integrity and P2 cancellation regression checks passed");
