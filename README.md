@@ -13,11 +13,11 @@ Independent on-chain analytics for the Pepegun fee collector on TON.
 
 ## Data
 
-Toncenter API v3 and TonAPI v2 provide public transaction history. The daily GitHub Actions job validates continuity, compares indexers at a common transaction tip and publishes a minimized snapshot without unrelated sender addresses or full comments. The browser checks for updates every 15 minutes while open.
+Toncenter API v3 and TonAPI v2 provide public transaction history. The daily GitHub Actions job validates continuity, compares indexers at a common transaction tip and tests the minimized snapshot before publication. If the alternate indexer is unavailable, the snapshot records that status; a detected disagreement blocks publication. Unrelated sender addresses and full comments are not retained. The browser checks for updates every 15 minutes while open.
 
 [Fee collector on Tonviewer](https://tonviewer.com/UQD-J5lB6VMC1Cyyz2bLEEflmiG0JRXv7fccO6olayRRqWrc)
 
-Wallet counts represent addresses, not individual users. Fee revenue is gross incoming labelled fees, not net profit or verified trades. Return rates count wallets first seen in the selected period that have a complete follow-up window and return on a later UTC day within 7, 14 or 30 days.
+Wallet counts represent addresses, not individual users. Fee revenue is the total of incoming transfers marked `Pepegun fee`, not net profit or a count of trades. All amounts are in GRAM. Return rates count wallets first seen in the selected period that have a complete follow-up window and return on a later UTC day within 7, 14 or 30 days.
 
 ## Development
 
@@ -25,6 +25,8 @@ Wallet counts represent addresses, not individual users. Fee revenue is gross in
 python3 -m http.server 8000 --directory docs
 node tests/analytics.test.mjs
 node tests/insights.test.mjs
+node tests/snapshot.test.mjs
+# Refresh the public snapshot from the indexers:
 node scripts/snapshot.mjs
 ```
 

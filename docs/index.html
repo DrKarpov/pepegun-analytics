@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#101211"><meta name="description" content="Independent on-chain statistics for the Pepegun fee collector: wallet activity, fees and growth.">
 <meta property="og:title" content="Pepegun Analytics"><meta property="og:description" content="Independent TON on-chain analytics."><meta property="og:type" content="website">
-<title>Pepegun Analytics</title><link rel="icon" type="image/svg+xml" href="./pepegun-logo.svg"><link rel="stylesheet" href="./styles.css?v=9">
+<title>Pepegun Analytics</title><link rel="icon" type="image/svg+xml" href="./pepegun-logo.svg"><link rel="stylesheet" href="./styles.css?v=10">
 </head>
 <body>
 <main class="page">
@@ -22,8 +22,8 @@
 <div id="finite" class="secondary" hidden></div>
 <section class="charts" aria-label="Charts">
 <article class="panel chart-card"><div class="chart-heading"><h2 data-i="growth">Audience growth</h2><span id="growth-interval" class="chart-interval"></span></div><p data-i="growthHint" class="sub">Cumulative distinct addresses since inception</p><div id="growth-chart" class="chart"></div></article>
-<article class="panel chart-card"><div class="chart-heading"><h2 data-i="daily">Daily active wallets</h2><span id="activity-interval" class="chart-interval"></span></div><p data-i="dailyHint" class="sub">Distinct wallets per UTC day</p><div id="daily-chart" class="chart"></div></article>
-<article class="panel chart-card"><div class="chart-heading"><h2 data-i="feesChart">Daily fee revenue</h2><span id="fee-interval" class="chart-interval"></span></div><p data-i="feesHint" class="sub">Gross incoming labelled fees · GRAM</p><div id="fees-chart" class="chart"></div></article>
+<article class="panel chart-card"><div class="chart-heading"><h2 data-i="daily">Wallet activity</h2><span id="activity-interval" class="chart-interval"></span></div><p data-i="dailyHint" class="sub">Distinct addresses per interval</p><div id="daily-chart" class="chart"></div></article>
+<article class="panel chart-card"><div class="chart-heading"><h2 data-i="feesChart">Fee revenue</h2><span id="fee-interval" class="chart-interval"></span></div><p data-i="feesHint" class="sub">Gross incoming labelled fees · GRAM</p><div id="fees-chart" class="chart"></div></article>
 
 </section>
 <section class="panel detail"><h2 data-i="venues">Activity by venue label</h2><p class="sub" data-i="venueHint">Labels in on-chain transfer comments, not verified trade execution.</p><div id="venues"></div></section>
@@ -32,5 +32,5 @@
 <details class="panel detail"><summary data-i="method">Methodology &amp; source</summary><div class="details-content" id="method"></div><h3 data-i="audit"></h3><p id="audit-meta" class="sub"></p><div class="insight-actions"><button id="audit-check" class="outline"></button><p id="audit-result" class="sub" aria-live="polite"></p></div><button id="resync" class="outline" data-i="resync">Reload full history</button></details>
 <footer><p data-i="disclaimer">Independent community dashboard, not operated or endorsed by Pepegun. Wallet addresses are not individual users.</p><a id="source" target="_blank" rel="noopener noreferrer" href="https://tonviewer.com/UQD-J5lB6VMC1Cyyz2bLEEflmiG0JRXv7fccO6olayRRqWrc" data-i="source">View on Tonviewer</a></footer>
 <noscript>JavaScript is required to fetch and aggregate public blockchain transactions.</noscript>
-</main><script type="module" src="./app.mjs?v=9"></script>
+</main><script type="module" src="./app.mjs?v=10"></script>
 </body></html>

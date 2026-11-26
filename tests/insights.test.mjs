@@ -4,7 +4,7 @@ import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange
 const t=Date.UTC(2026,9,15),row=(s,v,d)=>({s,lt:String(v),v:String(v),t:(t+d*DAY)/1000,k:"fee"});
 const rows=[row("a",1,0),row("a",3,1),row("b",5,1),row("c",7,1),row("d",9,1),row("e",11,1),row("f",13,1)];
 const range={from:t+DAY,to:t+2*DAY,preset:"custom"},x=extraMetrics(rows,range,t+3*DAY);
-assert.equal(x.median2,16n);assert.equal(x.total,48n);assert.equal(x.newPayers,5);assert.equal(x.repeatPayers,1);assert.equal(x.top5,45n);assert.equal(x.top10,48n);assert.equal(x.perPayer,8n);assert.equal(x.payByDay.get("2026-10-16"),5);
+assert.equal(x.median2,16n);assert.equal(x.total,48n);assert.equal(x.newPayers,5);assert.equal(x.repeatPayers,1);assert.equal(x.top5,45n);assert.equal(x.top10,48n);assert.equal(x.perPayer,8n);assert.equal(adaptiveSeries(rows,range,t+3*DAY).bins.reduce((a,b)=>a+b.newPay,0),5);
 assert.equal(commentKind("🔫 Pepegun fee · STON.fi · hash").k,"fee");assert.equal(commentKind("🔫 Pepegun · Stonks").k,"other");assert.equal(commentKind("not Pepegun fee").k,"ambiguous");assert.equal(commentKind("Pepegun fee refund").k,"ambiguous");assert.equal(commentKind("other"),null);
 assert.equal(previousRange(range,t).from,t);assert.equal(previousRange(range,t+DAY),null);assert.equal(previousRange({...range,preset:"all"},t),null);assert.equal(change(10,0),null);assert.equal(change(10,5),1);
 const tx={h:"a".repeat(64),lt:"1",prev:"0",t:t/1000,success:true,m:{s:"0:"+"b".repeat(64),v:"1",b:false,c:"Pepegun fee"}};
@@ -35,3 +35,9 @@ assert.equal(selectSnapshot(snap,{...snap,asOf:snap.asOf+1000}).asOf,snap.asOf+1
 assert.equal(selectSnapshot({...snap,tip:"2"},snap).tip,"2");
 assert.equal(selectSnapshot(snap,{...snap,tipHash:"f".repeat(64)}).tipHash,snap.tipHash);
 assert.equal(selectSnapshot(snap,{...snap,tipHash:"f".repeat(64),audit:check}).tipHash,"f".repeat(64));
+
+assert.equal(commentKind("Pepegun fee · @someone").d,"Unlabelled");
+assert.equal(commentKind("Pepegun fee · https://example.com").k,"fee");
+assert.equal(commentKind("Pepegun fee · Autosell:TopBlast V2").d,"Autosell:TopBlast V2");
+assert.equal(validateSeed({version:VERSION,address:RAW,source:"toncenter",asOf:t+DAY,transactions:[packTransaction(tx)],audit:{...check,status:"mismatch"}}),null);
+assert.equal(selectSnapshot(snap,{...snap,tipHash:"f".repeat(64),audit:{...check,tip:"0"}}).tipHash,snap.tipHash);

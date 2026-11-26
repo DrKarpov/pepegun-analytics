@@ -26,7 +26,9 @@ export function mapTx(x,source){
 export function commentKind(comment){
  if(typeof comment!=="string"||!comment.toLowerCase().includes("pepegun"))return null;
  const match=comment.trim().match(/^(?:🔫\uFE0F?\s*)?Pepegun(?:\s+(fee))?(?:\s*·\s*([^·\r\n]+)(?:\s*·[^\r\n]*)?)?$/iu);
- return match?{k:match[1]?"fee":"other",d:match[2]?.trim().slice(0,64)||"Unlabelled"}:{k:"ambiguous"};
+ if(!match)return {k:"ambiguous"};
+ const label=match[2]?.trim()||"";
+ return {k:match[1]?"fee":"other",d:label&&label.length<=64&&/^[\p{L}\p{N} .:_+\-]+$/u.test(label)&&!/(?:https?:|password|seed phrase|private key)/i.test(label)?label:"Unlabelled"};
 }
 export function classify(tx){
  const m=tx.m,kind=commentKind(m?.c);if(!kind||kind.k==="ambiguous")return null;
@@ -108,7 +110,7 @@ export async function sync(previous,progress,force=false){
     if(fresh.length&&verify(fresh,previous.tip)){
      const anchor=all.find(t=>t.lt===previous.tip);
      if(anchor&&anchor.h!==previous.tipHash)throw Error("Indexer disagrees at cached tip");
-     return cacheFrom(fresh,source,previous);
+     const next=cacheFrom(fresh,source,previous);if(!validCache(next))throw Error("Invalid incremental snapshot");return next;
     }
     if(!fresh.length){
      const head=await getPage(source,null,null,1,progress);
@@ -117,8 +119,8 @@ export async function sync(previous,progress,force=false){
    }
    const txs=await download(source,null,progress);
    if(!verify(txs,"0"))throw Error("Incomplete or empty full history");
-   if(validCache(previous)&&(compareLt(txs.at(-1).lt,previous.tip)<0||(txs.at(-1).lt===previous.tip&&txs.at(-1).h!==previous.tipHash)))throw Error("Indexer behind or inconsistent with last verified snapshot");
-   const next=cacheFrom(txs,source);if(validCache(previous)&&previous.audit&&typeof previous.audit.tip==="string"&&/^\d+$/.test(previous.audit.tip)&&compareLt(previous.audit.tip,next.tip)<=0)next.audit=previous.audit;return next;
+   if(validCache(previous)){const anchor=txs.find(t=>t.lt===previous.tip);if(!anchor||anchor.h!==previous.tipHash)throw Error("Indexer behind or inconsistent with last verified snapshot");}
+   const next=cacheFrom(txs,source);if(!validCache(next))throw Error("Invalid full snapshot");if(validCache(previous)&&previous.audit&&typeof previous.audit.tip==="string"&&/^\d+$/.test(previous.audit.tip)&&compareLt(previous.audit.tip,next.tip)<=0)next.audit=previous.audit;return next;
   }catch(e){last=e}
  }
  throw last||Error("Both sources unavailable");
@@ -139,32 +141,22 @@ export function resolveRange(preset,now,first,custom){
  }
  return {from,to:end,preset};
 }
-const aggregate=()=>({active:new Set(),paying:new Set(),fee:0n,count:0,other:0,otherValue:0n,largest:0n});
-function add(a,r){a.active.add(r.s);const v=BigInt(r.v);if(r.k==="fee"){a.paying.add(r.s);a.fee+=v;a.count++;if(v>a.largest)a.largest=v}else{a.other++;a.otherValue+=v}}
+const aggregate=()=>({active:new Set(),paying:new Set(),fee:0n,count:0,other:0,largest:0n});
+function add(a,r){a.active.add(r.s);if(r.k==="fee"){const v=BigInt(r.v);a.paying.add(r.s);a.fee+=v;a.count++;if(v>a.largest)a.largest=v}else a.other++}
 export function metrics(rows,range,now){
  if(!range)return null;
- const from=range.from,to=Math.min(range.to,now+1),first=new Map(),firstPay=new Map(),all=aggregate(),days=new Map(),venues=new Map(),activity={dau:new Set(),prev:new Set(),wau:new Set(),mau:new Set()};
+ const from=range.from,to=Math.min(range.to,now+1),first=new Map(),all=aggregate(),venues=new Map(),activity={dau:new Set(),wau:new Set(),mau:new Set()};
  const anchor=dayIndex(to-1);
  for(const r of rows){
   const t=r.t*1000;if(t>=to)continue;
   if(!first.has(r.s)||first.get(r.s)>t)first.set(r.s,t);
-  if(r.k==="fee"&&(!firstPay.has(r.s)||firstPay.get(r.s)>t))firstPay.set(r.s,t);
   const d=dayIndex(t);
-  if(d===anchor)activity.dau.add(r.s);if(d===anchor-1)activity.prev.add(r.s);if(d>=anchor-6)activity.wau.add(r.s);if(d>=anchor-29)activity.mau.add(r.s);
+  if(d===anchor)activity.dau.add(r.s);if(d>=anchor-6)activity.wau.add(r.s);if(d>=anchor-29)activity.mau.add(r.s);
   if(t<from)continue;
-  add(all,r);
-  for(const [map,key] of [[days,d],[venues,r.d]]){if(!map.has(key))map.set(key,aggregate());add(map.get(key),r)}
- }
- const started=[...first.values()].sort((a,b)=>a-b),paid=[...firstPay.values()].sort((a,b)=>a-b),daily=[];
- let si=0,pi=0;
- for(let d=dayIndex(from);d<=anchor;d++){
-  const start=Math.max(from,d*DAY),end=Math.min(to,(d+1)*DAY),a=days.get(d)||aggregate();
-  while(si<started.length&&started[si]<end)si++;while(pi<paid.length&&paid[pi]<end)pi++;
-  const n=[...a.active].filter(s=>first.get(s)>=start&&first.get(s)<end).length;
-  daily.push({date:dayKey(d),status:(d+1)*DAY>now+1?"incomplete":start>d*DAY||end<(d+1)*DAY?"partial":"complete",active:a.active.size,new:n,returning:a.active.size-n,paying:a.paying.size,fee:a.fee,count:a.count,other:a.other,cum:si,cumPay:pi});
+  add(all,r);if(!venues.has(r.d))venues.set(r.d,aggregate());add(venues.get(r.d),r);
  }
  const newWallets=[...all.active].filter(s=>first.get(s)>=from).length;
- return {wallets:all.active.size,paying:all.paying.size,newWallets,returning:all.active.size-newWallets,fee:all.fee,count:all.count,other:all.other,otherValue:all.otherValue,largest:all.largest,daily,venues:[...venues].map(([label,a])=>({label,fee:a.fee,count:a.count,other:a.other,wallets:a.active.size,paying:a.paying.size})).sort((a,b)=>a.fee>b.fee?-1:a.fee<b.fee?1:0),activity:Object.fromEntries(Object.entries(activity).map(([k,v])=>[k,v.size])),anchor:dayKey(anchor)};
+ return {wallets:all.active.size,paying:all.paying.size,newWallets,returning:all.active.size-newWallets,fee:all.fee,count:all.count,other:all.other,largest:all.largest,venues:[...venues].map(([label,a])=>({label,fee:a.fee,count:a.count,wallets:a.active.size})).sort((a,b)=>a.fee>b.fee?-1:a.fee<b.fee?1:a.label.localeCompare(b.label)),activity:Object.fromEntries(Object.entries(activity).map(([k,v])=>[k,v.size])),anchor:dayKey(anchor)};
 }
 export function compareSnapshots(snapshot,other){
  const byHash=new Map(other.rows.map(r=>[r.h,r]));
@@ -193,4 +185,3 @@ export function compactAmount(n,locale="en",digits=4){
  if(v>0n&&v<threshold)return "<"+amount(threshold,digits,locale,true);
  return amount(v,digits,locale,true);
 }
-export function csv(m){return ["date_utc,status,active_wallets,new_wallets,returning_wallets,paying_wallets,fee_payments,fee_gram,fee_nano,other_transfers,cumulative_wallets,cumulative_paying",...m.daily.map(d=>[d.date,d.status,d.active,d.new,d.returning,d.paying,d.count,exact(d.fee),String(d.fee),d.other,d.cum,d.cumPay].join(","))].join("\r\n")+"\r\n"}

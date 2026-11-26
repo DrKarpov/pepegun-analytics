@@ -8,6 +8,8 @@ on:
     paths:
       - '.github/workflows/snapshot.yml'
       - 'scripts/snapshot.mjs'
+      - 'docs/*.mjs'
+      - 'tests/*.mjs'
 
 permissions:
   contents: write
@@ -32,6 +34,7 @@ jobs:
           node tests/analytics.test.mjs
           node tests/insights.test.mjs
           node scripts/snapshot.mjs
+          node tests/snapshot.test.mjs
       - name: Publish verified snapshot
         run: |
           git config user.name "github-actions[bot]"
