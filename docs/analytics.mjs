@@ -116,8 +116,32 @@ export async function download(source,after,progress){
  }
  return ordered([...m.values()]);
 }
+export const AUDIT_SCOPE="full-history-v1";
+export function auditResult(snapshot,status,extra={}){
+ return {...extra,status,tip:snapshot.tip,tipHash:snapshot.tipHash,scope:AUDIT_SCOPE,asOf:Date.now()};
+}
+export function auditTrust(c){
+ const a=c?.audit;
+ if(!c||!validAudit(a,c.tip))return "unchecked";
+ if(a.status==="mismatch")return "mismatch";
+ if(a.status==="unavailable"||a.scope!==AUDIT_SCOPE||!c.history||!a.tipHash||c.history.find(row=>row[0]===a.tip)?.[1]!==a.tipHash)return "unavailable";
+ return a.tip===c.tip?"match":"prior";
+}
+// A failed/unavailable retry cannot erase an established disagreement.
+// A full-history match at the same or a later tip can supersede it.
+export function mergeAudit(c,...candidates){
+ if(!c)return null;
+ const checks=[c.audit,...candidates].filter(a=>validAudit(a,c.tip));
+ const usable=a=>a.status!=="match"||(a.scope===AUDIT_SCOPE&&c.history?.find(row=>row[0]===a.tip)?.[1]===a.tipHash&&!!a.tipHash);
+ const mismatch=checks.filter(a=>a.status==="mismatch").sort((a,b)=>b.asOf-a.asOf)[0];
+ const matches=checks.filter(a=>a.status==="match"&&usable(a)).sort((a,b)=>compareLt(b.tip,a.tip)||b.asOf-a.asOf);
+ const latest=checks.sort((a,b)=>b.asOf-a.asOf||compareLt(b.tip,a.tip))[0];
+ if(mismatch&&!matches.some(a=>compareLt(a.tip,mismatch.tip)>=0&&a.asOf>mismatch.asOf))return mismatch;
+ if(latest?.status==="match"&&!usable(latest))return matches[0]||latest;
+ return latest||null;
+}
 export function validAudit(a,tip){
- return !!a&&["match","mismatch","unavailable"].includes(a.status)&&typeof a.tip==="string"&&/^\d+$/.test(a.tip)&&compareLt(a.tip,tip)<=0&&Number.isFinite(a.asOf)&&a.asOf>0&&a.asOf<=Date.now()+60000;
+ return !!a&&["match","mismatch","unavailable"].includes(a.status)&&typeof a.tip==="string"&&/^\d+$/.test(a.tip)&&compareLt(a.tip,tip)<=0&&Number.isFinite(a.asOf)&&a.asOf>0&&a.asOf<=Date.now()+60000&&(a.scope===undefined||a.scope===AUDIT_SCOPE)&&(a.tipHash===undefined||(typeof a.tipHash==="string"&&hashPattern.test(a.tipHash)));
 }
 export function validCache(c){
  if(!c||c.version!==VERSION||c.address!==RAW||!["toncenter","tonapi"].includes(c.source)||!Array.isArray(c.rows)||typeof c.tip!=="string"||!/^\d+$/.test(c.tip)||!Number.isFinite(c.asOf)||c.asOf<=0||c.asOf>Date.now()+60000||!Number.isInteger(c.scanned)||c.scanned<=0||!Number.isInteger(c.ambiguous)||c.ambiguous<0||c.rows.length+c.ambiguous>c.scanned||typeof c.tipHash!=="string"||!/^[0-9a-f]{64}$/.test(c.tipHash)||!Number.isSafeInteger(c.tipTime)||!Number.isSafeInteger(c.firstTime)||c.firstTime<=0||c.tipTime<c.firstTime||c.tipTime*1000>c.asOf)return false;
@@ -160,7 +184,7 @@ export async function sync(previous,progress,force=false){
 }
 function db(){return new Promise((resolve,reject)=>{const r=indexedDB.open("pepegun-analytics-v2",1);r.onupgradeneeded=()=>r.result.createObjectStore("data");r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 export async function loadCache(){let d;try{d=await db();const c=await new Promise((resolve,reject)=>{const r=d.transaction("data").objectStore("data").get("current");r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});return validCache(c)?c:null}catch{return null}finally{d?.close()}}
-export async function saveCache(c){let d;try{if(!validCache(c))return false;d=await db();await new Promise((resolve,reject)=>{const t=d.transaction("data","readwrite"),store=t.objectStore("data"),r=store.get("current");r.onsuccess=()=>{const old=r.result;if(!validCache(old)||compareLt(c.tip,old.tip)>0||(c.tip===old.tip&&c.tipHash===old.tipHash&&c.asOf>=old.asOf))store.put(c,"current")};t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error)});return true}catch{return false}finally{d?.close()}}
+export async function saveCache(c){let d;try{if(!validCache(c))return false;d=await db();await new Promise((resolve,reject)=>{const t=d.transaction("data","readwrite"),store=t.objectStore("data"),r=store.get("current");r.onsuccess=()=>{const old=r.result;if(!validCache(old)){store.put(c,"current");return}const newer=compareLt(c.tip,old.tip)>0||(c.tip===old.tip&&c.tipHash===old.tipHash&&((!!c.history&&!old.history)||c.asOf>=old.asOf));const chosen=newer?c:old;store.put({...chosen,audit:mergeAudit(chosen,old.audit,c.audit)},"current")};t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error)});return true}catch{return false}finally{d?.close()}}
 export function resolveRange(preset,now,first,custom){
  const today=dayIndex(now),end=now+1;let from;
  if(preset==="all")from=dayIndex(first??now)*DAY;
@@ -198,12 +222,12 @@ export function compareSnapshots(snapshot,other){
 export async function crossCheck(snapshot,progress){
  if(!validCache(snapshot))throw Error("No verified snapshot");
  const source=snapshot.source==="toncenter"?"tonapi":"toncenter";
- if(!snapshot.history)return {status:"unavailable",source,asOf:Date.now(),tip:snapshot.tip};
+ if(!snapshot.history)return auditResult(snapshot,"unavailable",{source});
  const txs=await download(source,null,progress);
  const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
- if(!verify(upto,"0")||upto.at(-1)?.lt!==snapshot.tip)return {status:"unavailable",source,asOf:Date.now(),tip:snapshot.tip};
+ if(!verify(upto,"0")||upto.at(-1)?.lt!==snapshot.tip)return auditResult(snapshot,"unavailable",{source});
  const other=cacheFrom(upto,source,null,snapshot.asOf);
- return {status:compareSnapshots(snapshot,other)?"match":"mismatch",source,asOf:Date.now(),tip:snapshot.tip,scanned:other.scanned,rows:other.rows.length};
+ return auditResult(snapshot,compareSnapshots(snapshot,other)?"match":"mismatch",{source,scanned:other.scanned,rows:other.rows.length});
 }
 export function exact(n){const q=BigInt(n),s=q<0n?"-":"",v=q<0n?-q:q;return s+(v/1000000000n)+"."+(v%1000000000n).toString().padStart(9,"0")}
 export function amount(n,digits=2,locale="en",trim=false){
