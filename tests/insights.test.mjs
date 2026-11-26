@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {cardTimeLabels} from "../docs/card-export.mjs";
 import {commentKind,compareSnapshots,DAY,RAW,VERSION,cacheFrom,minimizeTransaction,packTransaction,validCache,validAudit,amount,compactAmount,resolveRange} from "../docs/analytics.mjs";
 import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,validateSeed,selectSnapshot} from "../docs/insights.mjs";
 const t=Date.UTC(2026,9,15),row=(s,v,d)=>({s,lt:String(v),v:String(v),t:(t+d*DAY)/1000,k:"fee"});
@@ -50,3 +51,9 @@ assert.equal(selectSnapshot(snap,conflictingExtension).tipHash,snap.tipHash);
 assert.equal(selectSnapshot(snap,conflictingExtension).audit.status,"mismatch");
 assert.equal(selectSnapshot(advanced,conflicting).tipHash,advanced.tipHash);
 assert.equal(selectSnapshot(advanced,conflicting).audit.status,"mismatch");
+
+// P2-06: a single UTC marker adjacent to a clock, never to a date alone.
+assert.deepEqual(cardTimeLabels("15 окт. — 26 нояб. 2026 г. · UTC","1 день · UTC","26 нояб. 2026 г. · Не завершён"),{period:"15 окт. — 26 нояб. 2026 г.",subtitle:"1 день",readout:"26 нояб. 2026 г. · Не завершён"});
+assert.deepEqual(cardTimeLabels("Nov 26 07:00 — Nov 26, 2026 13:00 · UTC","15 min · UTC","12:45 — 13:00 · UTC · Active: 1"),{period:"Nov 26 07:00 — Nov 26, 2026 13:00 UTC",subtitle:"15 min",readout:"12:45 — 13:00 · Active: 1"});
+assert.deepEqual(cardTimeLabels("Nov 20 — Nov 26, 2026 · UTC","6 hours · UTC","Nov 26 12:00 — 13:00 · Active: 1"),{period:"Nov 20 — Nov 26, 2026",subtitle:"6 hours",readout:"Nov 26 12:00 — 13:00 UTC · Active: 1"});
+assert.deepEqual(cardTimeLabels("На 26 нояб. 2026 г.","Календарные дни",""),{period:"На 26 нояб. 2026 г.",subtitle:"Календарные дни",readout:""});

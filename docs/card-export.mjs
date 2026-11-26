@@ -11,16 +11,18 @@ function capture(card,meta){
  if(id==="overview"||id==="finite"){
   return {...base,title:L[id],tiles:[...card.querySelectorAll(".kpi")].map(k=>({label:text(k,".kpi-label"),value:text(k,".kpi-value"),hint:text(k,".kpi-hint"),primary:k.classList.contains("primary")}))};
  }
- if(id==="active")return {...base,title:text(card,".activity-title strong"),subtitle:text(card,".activity-title small"),tiles:[...card.querySelectorAll(".active-stat")].map(k=>({label:text(k,"small"),value:text(k,"strong"),hint:""}))};
+ if(id==="active")return {...base,title:text(card,".activity-title strong"),subtitle:meta.calendarCaption,meta:{...base.meta,period:meta.activePeriod},tiles:[...card.querySelectorAll(".active-stat")].map(k=>({label:text(k,"small"),value:text(k,"strong"),hint:""}))};
  const svg=card.querySelector(".chart-plot");if(!svg)throw Error("Chart unavailable");
  const clone=svg.cloneNode(true),view=svg.viewBox.baseVal;clone.setAttribute("xmlns","http://www.w3.org/2000/svg");clone.setAttribute("font-family","system-ui, sans-serif");clone.removeAttribute("tabindex");clone.querySelectorAll(".cursor").forEach(el=>el.remove());clone.setAttribute("width",String(view.width));clone.setAttribute("height",String(view.height));
  return {...base,title:text(card,"h2"),subtitle:text(card,".chart-interval"),description:text(card,".sub"),readout:text(card,".chart-readout"),svg:new XMLSerializer().serializeToString(clone),ratio:view.height/view.width,legend:[...card.querySelectorAll(".chart-legend span")].map(s=>({label:s.textContent.trim(),color:s.querySelector("i")?.style.backgroundColor||palette.accent}))};
 }
-// Export-only UTC label: once, next to the clock time in the green period line.
+// Export-only UTC label: once beside an actual clock time, preferring the range.
 export function cardTimeLabels(period,subtitle,readout){
  const clean=value=>String(value||"").replace(/\s*·\s*UTC\b|\s*\(UTC\)|\s*\bUTC\b/g,"").replace(/\s{2,}/g," ").trim();
  const result={period:clean(period),subtitle:clean(subtitle),readout:clean(readout)};
- result.period=result.period.replace(/\b\d{1,2}:\d{2}\b(?![\s\S]*\b\d{1,2}:\d{2}\b)/,v=>v+" UTC");
+ const lastClock=/\b\d{1,2}:\d{2}\b(?![\s\S]*\b\d{1,2}:\d{2}\b)/;
+ const field=lastClock.test(result.period)?"period":lastClock.test(result.readout)?"readout":lastClock.test(result.subtitle)?"subtitle":null;
+ if(field)result[field]=result[field].replace(lastClock,v=>v+" UTC");
  return result;
 }
 
@@ -42,8 +44,11 @@ export async function renderCardPng(s){
  function round(x,y,w,h,fill){g.beginPath();if(g.roundRect)g.roundRect(x,y,w,h,14);else g.rect(x,y,w,h);g.fillStyle=fill;g.fill();g.strokeStyle=palette.border;g.lineWidth=1;g.stroke()}
  function fit(value,x,y,n,width,color,b=true){font(n,b);while(n>12&&g.measureText(value).width>width)font(--n,b);g.textAlign="center";g.textBaseline="top";g.fillStyle=color;g.fillText(value,x,y)}
  const dates=cardTimeLabels(s.meta.period,s.subtitle,s.readout);
- const title=lines(s.title,cw-24,23,true),sub=lines(dates.subtitle,cw-24,15),desc=lines(s.description,cw-24,15),period=lines(dates.period+(s.meta.stale?" · "+L.stale:"")+(s.meta.trust?" · "+s.meta.trust:""),cw,15,true),read=lines(dates.readout,cw-28,15);
- const top=p+36+6+period.length*20+10;
+ const title=lines(s.title,cw-24,23,true),sub=lines(dates.subtitle,cw-24,15),desc=lines(s.description,cw-24,15),period=lines(dates.period,cw,15,true),read=lines(dates.readout,cw-28,15);
+ // The period is not a trust indicator. Omit routine match/prior labels;
+ // retain material uncertainty separately, including unavailable/unchecked.
+ const warning=lines([s.meta.stale?L.stale:"",s.meta.warning||""].filter(Boolean).join(" · "),cw,13,true);
+ const top=p+36+6+period.length*20+warning.length*18+10;
  let tiles=[],rows=[],cols=0,tileW=0,cardH=0,plotH=0,legendRows=[];
  const contentTop=12+title.length*30+sub.length*20+desc.length*20;
  if(s.tiles){
@@ -60,7 +65,7 @@ export async function renderCardPng(s){
  const logo=await imageFrom(new URL("./pepegun-logo.svg",import.meta.url).href);
  const logoScale=Math.min(34/logo.naturalWidth,34/logo.naturalHeight);const lw=logo.naturalWidth*logoScale,lh=logo.naturalHeight*logoScale;font(24,true);const brandW=34+9+g.measureText("Pepegun Analytics").width,bx=(W-brandW)/2;g.drawImage(logo,bx+(34-lw)/2,p+(34-lh)/2,lw,lh);
  drawLines(["Pepegun Analytics"],bx+43,p+3,24,palette.text,true,"left");
- let y=p+42;y=drawLines(period,W/2,y,15,s.meta.suspect?"#ffb16b":palette.accent,true,"center",20);
+ let y=p+42;y=drawLines(period,W/2,y,15,palette.accent,true,"center",20);y=drawLines(warning,W/2,y,13,"#ffb16b",true,"center",18);
  round(p,top,cw,cardH,palette.card);y=top+12;y=drawLines(title,W/2,y,23,palette.text,true,"center",30);y=drawLines(sub,W/2,y,15,palette.muted,false,"center",20);y=drawLines(desc,W/2,y,15,palette.muted,false,"center",20);
  if(s.tiles){
   for(const r of rows){r.group.forEach((t,i)=>{const x=p+i*tileW,mid=x+tileW/2;
