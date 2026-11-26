@@ -29,3 +29,5 @@ node scripts/snapshot.mjs
 ```
 
 Independent community project, not an official Pepegun product.
+
+Amounts are rounded only for display (up to four decimals); CSV retains exact nano-unit values. Period comparison is shown only when a full comparable earlier interval is available.

@@ -206,3 +206,25 @@ footer p{max-width:720px}
 #tx-context:empty{display:none}.tx-list{margin-top:6px}.tx-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}.tx-row:last-child{border-bottom:0}.tx-row strong,.tx-row small,.tx-row a{display:block;overflow-wrap:anywhere}.tx-row strong{font-size:13px;font-weight:500}.tx-row small,.tx-row a{font-size:11px;line-height:1.5}.tx-row small{color:var(--muted)}.tx-right{text-align:right}.tx-right a{display:inline-flex;align-items:center;justify-content:flex-end;min-height:44px}.tx-row small+small{margin-top:2px}
 @media(min-width:800px){.charts .chart-card:first-child{grid-column:1/-1}}
 @media(max-width:520px){.filters button{font-size:11px;padding:0 2px}.chart-heading h2{font-size:14px}.chart-interval{font-size:10px}.return-grid strong{font-size:18px}.return-grid>div{padding:8px 6px}.return-grid span,.return-grid small{font-size:10px}.tx-row strong{font-size:12px}.tx-row small,.tx-row a{font-size:10.5px}}
+
+/* Consistent controls and compact empty states. */
+button{-webkit-appearance:none;appearance:none}
+button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.tx-filters{gap:5px;align-items:center}
+.tx-filters button{border:1px solid var(--border);border-radius:8px;min-height:44px;font-family:inherit;color:var(--muted);background:var(--card);line-height:1.2;padding:0 11px}
+.tx-filters button[aria-pressed=true]{border-color:var(--accent);background:#222c1c;color:var(--accent);border-radius:8px}
+.tx-filters button:focus-visible{outline-offset:2px;border-radius:8px}
+.tx-controls #tx-reset{border-radius:8px}
+.tx-row{grid-template-columns:minmax(0,1fr) minmax(104px,auto);align-items:start}
+.tx-right{min-width:0;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.tx-right strong{white-space:nowrap;font-variant-numeric:tabular-nums}
+.tx-right a{align-self:flex-end;justify-content:flex-end;min-height:44px;white-space:nowrap}
+.tx-row>div:first-child{min-width:0}.tx-row>div:first-child small{overflow-wrap:anywhere}
+.return-grid>div{display:flex;flex-direction:column;justify-content:space-between;gap:3px}
+.empty-note{font-size:12px;color:var(--muted);line-height:1.5;padding:10px 0;margin:4px 0}
+#comparison-section,#retention-section{min-width:0}
+#comparison-section h3,#retention-section h3{margin-top:16px}
+#comparison .table-wrap th:first-child,#comparison .table-wrap td:first-child{white-space:normal;min-width:105px;max-width:155px}
+#history .table-wrap th:first-child,#history .table-wrap td:first-child{white-space:normal;min-width:105px;max-width:155px}
+@media(max-width:520px){.tx-controls{align-items:flex-start}.tx-filters button{font-size:12px;padding:0 9px}.tx-row{grid-template-columns:minmax(0,1fr) minmax(95px,auto);gap:8px}.tx-right strong{font-size:13px}.return-grid{gap:6px}.return-grid>div{padding:8px 6px}.return-grid strong{font-size:18px}}
+@media(max-width:350px){.tx-row{grid-template-columns:minmax(0,1fr) minmax(90px,auto)}.tx-right strong{font-size:12px}.tx-filters button{padding:0 7px}}

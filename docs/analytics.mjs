@@ -85,7 +85,11 @@ export async function download(source,after,progress){
  }
  return ordered([...m.values()]);
 }
-function validCache(c){return !!c&&c.version===VERSION&&c.address===RAW&&Array.isArray(c.rows)&&typeof c.tip==="string"&&/^\d+$/.test(c.tip)&&Number.isFinite(c.asOf)&&Number.isInteger(c.scanned)&&c.scanned>0&&typeof c.tipHash==="string"&&/^[0-9a-f]{64}$/.test(c.tipHash)&&Number.isFinite(c.tipTime)&&Number.isFinite(c.firstTime)}
+export function validCache(c){
+ if(!c||c.version!==VERSION||c.address!==RAW||!["toncenter","tonapi"].includes(c.source)||!Array.isArray(c.rows)||typeof c.tip!=="string"||!/^\d+$/.test(c.tip)||!Number.isFinite(c.asOf)||c.asOf<=0||c.asOf>Date.now()+60000||!Number.isInteger(c.scanned)||c.scanned<=0||!Number.isInteger(c.ambiguous)||c.ambiguous<0||c.rows.length+c.ambiguous>c.scanned||typeof c.tipHash!=="string"||!/^[0-9a-f]{64}$/.test(c.tipHash)||!Number.isSafeInteger(c.tipTime)||!Number.isSafeInteger(c.firstTime)||c.firstTime<=0||c.tipTime<c.firstTime||c.tipTime*1000>c.asOf)return false;
+ const seen=new Set(),lt=new Set();
+ return c.rows.every(r=>{if(!r||typeof r.h!=="string"||!/^[0-9a-f]{64}$/.test(r.h)||seen.has(r.h)||typeof r.lt!=="string"||!/^\d+$/.test(r.lt)||lt.has(r.lt)||compareLt(r.lt,c.tip)>0||!Number.isSafeInteger(r.t)||r.t<c.firstTime||r.t>c.tipTime||!raw(r.s)||r.s!==raw(r.s)||r.s===RAW||typeof r.v!=="string"||!/^\d+$/.test(r.v)||BigInt(r.v)<=0n||!["fee","other"].includes(r.k)||typeof r.d!=="string"||r.d.length>64)return false;seen.add(r.h);lt.add(r.lt);return true});
+}
 export function cacheFrom(txs,source,previous=null,now=Date.now()){
  const m=new Map((previous?.rows||[]).map(r=>[r.h,r]));
  for(const tx of txs){const r=classify(tx);if(r)m.set(r.h,r)}
@@ -110,18 +114,18 @@ export async function sync(previous,progress,force=false){
    const txs=await download(source,null,progress);
    if(!verify(txs,"0"))throw Error("Incomplete or empty full history");
    if(validCache(previous)&&(compareLt(txs.at(-1).lt,previous.tip)<0||(txs.at(-1).lt===previous.tip&&txs.at(-1).h!==previous.tipHash)))throw Error("Indexer behind or inconsistent with last verified snapshot");
-   return cacheFrom(txs,source);
+   const next=cacheFrom(txs,source);if(validCache(previous)&&previous.audit&&typeof previous.audit.tip==="string"&&/^\d+$/.test(previous.audit.tip)&&compareLt(previous.audit.tip,next.tip)<=0)next.audit=previous.audit;return next;
   }catch(e){last=e}
  }
  throw last||Error("Both sources unavailable");
 }
 function db(){return new Promise((resolve,reject)=>{const r=indexedDB.open("pepegun-analytics-v2",1);r.onupgradeneeded=()=>r.result.createObjectStore("data");r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 export async function loadCache(){let d;try{d=await db();const c=await new Promise((resolve,reject)=>{const r=d.transaction("data").objectStore("data").get("current");r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});return validCache(c)?c:null}catch{return null}finally{d?.close()}}
-export async function saveCache(c){let d;try{d=await db();await new Promise((resolve,reject)=>{const t=d.transaction("data","readwrite");t.objectStore("data").put(c,"current");t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error)});return true}catch{return false}finally{d?.close()}}
+export async function saveCache(c){let d;try{if(!validCache(c))return false;d=await db();await new Promise((resolve,reject)=>{const t=d.transaction("data","readwrite"),store=t.objectStore("data"),r=store.get("current");r.onsuccess=()=>{const old=r.result;if(!validCache(old)||compareLt(c.tip,old.tip)>0||(c.tip===old.tip&&c.tipHash===old.tipHash&&c.asOf>=old.asOf))store.put(c,"current")};t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error)});return true}catch{return false}finally{d?.close()}}
 export function resolveRange(preset,now,first,custom){
  const today=dayIndex(now),end=now+1;let from;
  if(preset==="all")from=dayIndex(first??now)*DAY;
- else if(preset==="6h"||preset==="24h")from=now-(preset==="6h"?DAY/4:DAY);
+ else if(preset==="6h"||preset==="24h")from=end-(preset==="6h"?DAY/4:DAY);
  else if(preset==="7d"||preset==="30d")from=(today-(preset==="7d"?6:29))*DAY;
  else{
   const date=s=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(s||""))return NaN;const t=Date.parse(s+"T00:00:00Z");return Number.isFinite(t)&&dayKey(dayIndex(t))===s?t:NaN};
@@ -135,33 +139,28 @@ const aggregate=()=>({active:new Set(),paying:new Set(),fee:0n,count:0,other:0,o
 function add(a,r){a.active.add(r.s);const v=BigInt(r.v);if(r.k==="fee"){a.paying.add(r.s);a.fee+=v;a.count++;if(v>a.largest)a.largest=v}else{a.other++;a.otherValue+=v}}
 export function metrics(rows,range,now){
  if(!range)return null;
- const from=range.from,to=Math.min(range.to,now+1),first=new Map(),firstPay=new Map(),all=aggregate(),days=new Map(),weeks=new Map(),venues=new Map(),activity={dau:new Set(),prev:new Set(),wau:new Set(),mau:new Set()},walletWeeks=new Map();
+ const from=range.from,to=Math.min(range.to,now+1),first=new Map(),firstPay=new Map(),all=aggregate(),days=new Map(),venues=new Map(),activity={dau:new Set(),prev:new Set(),wau:new Set(),mau:new Set()};
  const anchor=dayIndex(to-1);
  for(const r of rows){
   const t=r.t*1000;if(t>=to)continue;
   if(!first.has(r.s)||first.get(r.s)>t)first.set(r.s,t);
   if(r.k==="fee"&&(!firstPay.has(r.s)||firstPay.get(r.s)>t))firstPay.set(r.s,t);
-  const d=dayIndex(t),w=weekIndex(d);
+  const d=dayIndex(t);
   if(d===anchor)activity.dau.add(r.s);if(d===anchor-1)activity.prev.add(r.s);if(d>=anchor-6)activity.wau.add(r.s);if(d>=anchor-29)activity.mau.add(r.s);
-  if(!walletWeeks.has(r.s))walletWeeks.set(r.s,new Set());walletWeeks.get(r.s).add(w);
   if(t<from)continue;
   add(all,r);
-  for(const [map,key] of [[days,d],[weeks,w],[venues,r.d]]){if(!map.has(key))map.set(key,aggregate());add(map.get(key),r)}
+  for(const [map,key] of [[days,d],[venues,r.d]]){if(!map.has(key))map.set(key,aggregate());add(map.get(key),r)}
  }
- const started=[...first.values()].sort((a,b)=>a-b),paid=[...firstPay.values()].sort((a,b)=>a-b),daily=[],weekly=[];
+ const started=[...first.values()].sort((a,b)=>a-b),paid=[...firstPay.values()].sort((a,b)=>a-b),daily=[];
  let si=0,pi=0;
  for(let d=dayIndex(from);d<=anchor;d++){
   const start=Math.max(from,d*DAY),end=Math.min(to,(d+1)*DAY),a=days.get(d)||aggregate();
   while(si<started.length&&started[si]<end)si++;while(pi<paid.length&&paid[pi]<end)pi++;
   const n=[...a.active].filter(s=>first.get(s)>=start&&first.get(s)<end).length;
-  daily.push({date:dayKey(d),status:(d+1)*DAY>now?"incomplete":start>d*DAY||end<(d+1)*DAY?"partial":"complete",active:a.active.size,new:n,returning:a.active.size-n,paying:a.paying.size,fee:a.fee,count:a.count,other:a.other,cum:si,cumPay:pi});
+  daily.push({date:dayKey(d),status:(d+1)*DAY>now+1?"incomplete":start>d*DAY||end<(d+1)*DAY?"partial":"complete",active:a.active.size,new:n,returning:a.active.size-n,paying:a.paying.size,fee:a.fee,count:a.count,other:a.other,cum:si,cumPay:pi});
  }
- for(let w=weekIndex(dayIndex(from));w<=weekIndex(anchor);w++){const a=weeks.get(w)||aggregate(),start=weekStart(w)*DAY;weekly.push({date:dayKey(weekStart(w)),status:start<from||start+7*DAY>to?"partial":"complete",active:a.active.size,paying:a.paying.size,fee:a.fee,count:a.count})}
  const newWallets=[...all.active].filter(s=>first.get(s)>=from).length;
- const cohorts=new Map(),last=weekIndex(anchor);
- for(const [s,ws] of walletWeeks){const w=weekIndex(dayIndex(first.get(s)));if(!cohorts.has(w))cohorts.set(w,[]);cohorts.get(w).push(ws)}
- const retention=[...cohorts.entries()].sort((a,b)=>b[0]-a[0]).slice(0,12).map(([w,members])=>({date:dayKey(weekStart(w)),size:members.length,active:Array.from({length:Math.min(9,last-w+1)},(_,i)=>members.filter(s=>s.has(w+i)).length)}));
- return {wallets:all.active.size,paying:all.paying.size,newWallets,returning:all.active.size-newWallets,fee:all.fee,count:all.count,other:all.other,otherValue:all.otherValue,largest:all.largest,daily,weekly,venues:[...venues].map(([label,a])=>({label,fee:a.fee,count:a.count,other:a.other,wallets:a.active.size,paying:a.paying.size})).sort((a,b)=>a.fee>b.fee?-1:a.fee<b.fee?1:0),activity:Object.fromEntries(Object.entries(activity).map(([k,v])=>[k,v.size])),anchor:dayKey(anchor),anchorIncomplete:(anchor+1)*DAY>now,retention,currentWeekPartial:weekStart(last)*DAY+7*DAY>to};
+ return {wallets:all.active.size,paying:all.paying.size,newWallets,returning:all.active.size-newWallets,fee:all.fee,count:all.count,other:all.other,otherValue:all.otherValue,largest:all.largest,daily,venues:[...venues].map(([label,a])=>({label,fee:a.fee,count:a.count,other:a.other,wallets:a.active.size,paying:a.paying.size})).sort((a,b)=>a.fee>b.fee?-1:a.fee<b.fee?1:0),activity:Object.fromEntries(Object.entries(activity).map(([k,v])=>[k,v.size])),anchor:dayKey(anchor)};
 }
 export function compareSnapshots(snapshot,other){
  const byHash=new Map(other.rows.map(r=>[r.h,r]));
@@ -177,5 +176,17 @@ export async function crossCheck(snapshot,progress){
  return {status:compareSnapshots(snapshot,other)?"match":"mismatch",source,asOf:Date.now(),tip:snapshot.tip,scanned:other.scanned,rows:other.rows.length};
 }
 export function exact(n){const q=BigInt(n),s=q<0n?"-":"",v=q<0n?-q:q;return s+(v/1000000000n)+"."+(v%1000000000n).toString().padStart(9,"0")}
-export function amount(n,digits=2,locale="en"){const f=10n**BigInt(9-digits),q=(BigInt(n)+f/2n)/f,p=10n**BigInt(digits);return new Intl.NumberFormat(locale,{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(Number(q)/Number(p))}
+export function amount(n,digits=2,locale="en",trim=false){
+ if(!Number.isInteger(digits)||digits<0||digits>9)throw Error("Invalid precision");
+ const signed=BigInt(n),v=signed<0n?-signed:signed,f=10n**BigInt(9-digits),q=(v+f/2n)/f,scale=10n**BigInt(digits),whole=q/scale;
+ let frac=digits?(q%scale).toString().padStart(digits,"0"):"";
+ if(trim)frac=frac.replace(/0+$/,"");
+ const sep=new Intl.NumberFormat(locale).formatToParts(1.1).find(p=>p.type==="decimal")?.value||".";
+ return (signed<0n&&q>0n?"−":"")+new Intl.NumberFormat(locale,{maximumFractionDigits:0}).format(whole)+(frac?sep+frac:"");
+}
+export function compactAmount(n,locale="en",digits=4){
+ const v=BigInt(n),threshold=10n**BigInt(9-digits);
+ if(v>0n&&v<threshold)return "<"+amount(threshold,digits,locale,true);
+ return amount(v,digits,locale,true);
+}
 export function csv(m){return ["date_utc,status,active_wallets,new_wallets,returning_wallets,paying_wallets,fee_payments,fee_gram,fee_nano,other_transfers,cumulative_wallets,cumulative_paying",...m.daily.map(d=>[d.date,d.status,d.active,d.new,d.returning,d.paying,d.count,exact(d.fee),String(d.fee),d.other,d.cum,d.cumPay].join(","))].join("\r\n")+"\r\n"}

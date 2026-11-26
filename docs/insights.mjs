@@ -1,4 +1,4 @@
-import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,exact,weekIndex,weekStart} from "./analytics.mjs";
+import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,exact,weekIndex,weekStart} from "./analytics.mjs?v=8";
 export function extraMetrics(rows,range,now){
  const to=Math.min(range.to,now+1),from=range.from,firstPay=new Map(),feeValues=[],byWallet=new Map(),newPayers=new Set(),payByDay=new Map();let total=0n;
  for(const r of rows){const t=r.t*1000;if(t>=to||r.k!=="fee")continue;if(!firstPay.has(r.s)||firstPay.get(r.s)>t)firstPay.set(r.s,t);if(t<from)continue;const v=BigInt(r.v);feeValues.push(v);total+=v;byWallet.set(r.s,(byWallet.get(r.s)||0n)+v);}
@@ -13,13 +13,13 @@ export function previousRange(range,first){
  if(!range||range.preset==="all")return null;
  const shift=(range.preset==="24h"||range.preset==="6h")?(range.preset==="6h"?DAY/4:DAY):(dayIndex(range.to-1)-dayIndex(range.from)+1)*DAY;
  const from=range.from-shift,to=range.to-shift;
- if(from<dayIndex(first)*DAY||to<=from)return null;
+ if(!Number.isFinite(first)||from<dayIndex(first)*DAY||to<=from||to>range.from)return null;
  return {from,to,preset:"previous"};
 }
 export function change(a,b){return b===0n||b===0?null:(Number(a)-Number(b))/Number(b)}
 
 const H=3600000;
-export function chooseInterval(range){const n=range.to-range.from-1;return n<=6*H?"15m":n<=DAY?"1h":n<=3*DAY?"3h":n<=7*DAY?"6h":n<=90*DAY?"day":n<=366*DAY?"week":"month"}
+export function chooseInterval(range){const n=range.to-range.from;return n<=6*H?"15m":n<=DAY?"1h":n<=3*DAY?"3h":n<=7*DAY?"6h":n<=90*DAY?"day":n<=366*DAY?"week":"month"}
 const fixed={"15m":H/4,"1h":H,"3h":3*H,"6h":6*H,day:DAY};
 function floorBucket(t,k){if(fixed[k])return Math.floor(t/fixed[k])*fixed[k];if(k==="week")return weekStart(weekIndex(dayIndex(t)))*DAY;const d=new Date(t);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)}
 function nextBucket(t,k){if(fixed[k])return t+fixed[k];if(k==="week")return t+7*DAY;const d=new Date(t);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1)}
@@ -31,7 +31,7 @@ export function adaptiveSeries(rows,range,now){
  for(let a=floorBucket(from,kind);a<to;a=nextBucket(a,kind)){
   const next=nextBucket(a,kind),start=Math.max(from,a),end=Math.min(to,next);
   while(j<newTimes.length&&newTimes[j]<end)j++;while(k<payTimes.length&&payTimes[k]<end)k++;
-  const bin={start,end,bucket:a,date:new Date(a).toISOString(),status:next>now?"incomplete":start>a||end<next?"partial":"complete",activeSet:new Set(),paySet:new Set(),new:0,returning:0,newPay:0,fee:0n,count:0,other:0,cum:j,cumPay:k};
+  const bin={start,end,bucket:a,date:new Date(a).toISOString(),status:next>now+1?"incomplete":start>a||end<next?"partial":"complete",activeSet:new Set(),paySet:new Set(),new:0,returning:0,newPay:0,fee:0n,count:0,other:0,cum:j,cumPay:k};
   byStart.set(a,bin);bins.push(bin);
  }
  for(const r of rows){const t=r.t*1000;if(t<from||t>=to)continue;const b=byStart.get(floorBucket(t,kind));if(!b)continue;b.activeSet.add(r.s);if(r.k==="fee"){b.paySet.add(r.s);b.fee+=BigInt(r.v);b.count++}else b.other++}
