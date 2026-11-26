@@ -274,19 +274,18 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 @media(max-width:350px){.statusline{padding-inline-start:12px}.date-fields input{padding-inline:4px;font-size:11px}}
 
 /* v15: shared metric rows and centered native date controls. */
-.refresh{position:relative;border-color:transparent;border-radius:8px;background:transparent;color:var(--muted)}
-.refresh::before{content:"";position:absolute;inset:5px;border:1px solid var(--border);border-radius:50%;background:var(--card);pointer-events:none}
-.refresh svg{position:relative;width:19px;height:19px}
-.refresh:hover:not(:disabled){border-color:transparent;background:transparent;color:var(--accent)}
-.refresh:hover:not(:disabled)::before{border-color:var(--accent);background:var(--raised)}
-.refresh:focus-visible{border-radius:50%}
+.refresh{position:relative;border:0;border-radius:8px;background:transparent;color:var(--muted)}
+.refresh svg{display:block;width:22px;height:22px}
+.refresh:hover:not(:disabled),.refresh:active:not(:disabled){border-color:transparent;background:transparent;color:var(--accent)}
+.refresh.loading{opacity:1;color:var(--accent);background:transparent}
+.refresh:focus-visible{border-radius:8px}
 .date-fields input{height:44px;min-height:44px;display:flex;align-items:center;justify-content:center;padding-block:0;line-height:normal;border-color:#52653d;background:#1a2417;font-weight:500}
 .date-fields input::-webkit-date-and-time-value{display:flex;align-items:center;justify-content:center;height:42px;line-height:42px;margin:0;padding:0;text-align:center}
 .date-fields input::-webkit-datetime-edit{display:flex;align-items:center;justify-content:center;min-width:0;padding:0;line-height:normal}
 .date-fields input::-webkit-calendar-picker-indicator{flex-shrink:0;margin:0;padding:0}
 .date-fields input:focus{border-color:var(--accent)}
 .kpi{align-content:start;align-items:center;grid-template-rows:minmax(2.7em,auto) auto minmax(2.8em,auto)}
-.kpi-label{color:#cbd3cd;font-weight:500;align-self:center}
+.kpi-label{color:var(--text);font-weight:500;align-self:center}
 .kpi-value{align-self:center;line-height:1.18}
 .kpi-hint{display:block;align-self:start;min-height:1.4em}
 .kpi-hint:empty{display:block;visibility:hidden}
@@ -307,7 +306,9 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 .advanced-grid>div{grid-template-columns:minmax(0,1fr);justify-items:stretch;text-align:center;min-width:0}
 .advanced-grid>div>span,.advanced-grid>div>strong{width:100%;min-width:0;text-align:center;overflow-wrap:anywhere;align-self:center}
 .return-grid{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
-.return-grid>div{grid-row:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(2.8em,auto) auto minmax(1.4em,auto);align-content:center;align-items:center;justify-content:stretch;justify-items:stretch;gap:4px;min-width:0;text-align:center}
+.return-grid>div{grid-row:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;align-content:center;align-items:center;justify-items:stretch;gap:6px;min-width:0;padding-block:12px;text-align:center}
 .return-grid>div>span,.return-grid>div>strong,.return-grid>div>small{display:block;width:100%;min-width:0;text-align:center;align-self:center;justify-self:stretch;margin:0}
+.return-grid>div>span{color:var(--text);font-weight:500;line-height:1.4}
 .return-grid>div>strong{line-height:1.2}
+.return-grid>div>small{line-height:1.4;color:var(--muted)}
 @media(max-width:350px){.return-grid>div{padding-inline:4px}.return-grid>div>strong{font-size:16px}}

@@ -29,3 +29,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 
 ## v16 detailed-statistics follow-up
 - User screenshot identified misaligned detailed statistics and left-shifted retention cards on mobile. Use explicit full-width centered child tracks; retention cards use a normal single-column grid per card rather than row subgrid. Shortened per-payer label in both languages. Formula remains total labelled fees divided by distinct paying wallets in the period. Real iOS Safari verification remains open.
+
+## v17 visual follow-up
+- User screenshots: center the retention-card content as a compact group with equal top/bottom padding, make KPI and retention headings white while preserving muted explanatory text, and replace the refresh icon itself with a single-arrow variant without a surrounding ring/background. Preserve green loading state and rotation, click target, existing focus outline and all data/logic. Actual iOS rendering remains unverified until checked on device.
