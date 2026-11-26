@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {RAW,cacheFrom,compareSnapshots,verify,validCache,mapTx,crossCheck,sync,auditTrust,mergeAudit,auditResult,packTransaction,unpackTransaction} from "../docs/analytics.mjs";
+import {RAW,cacheFrom,compareSnapshots,verify,validCache,mapTx,crossCheck,sync,auditTrust,mergeAudit,auditResult,historyConflict,packTransaction,unpackTransaction} from "../docs/analytics.mjs";
 const hash=i=>String(i).padStart(64,"0");
 const t=[1,2,3].map(i=>({h:hash(i),lt:String(i),prev:String(i-1),prevHash:hash(i-1),t:100+i,success:true,m:null}));
 const c=cacheFrom(t,"toncenter"),other=cacheFrom(t,"tonapi");
@@ -24,9 +24,10 @@ assert.equal(mapTx({...common,account:{address:RAW},utime:102,aborted:false,succ
 assert.throws(()=>mapTx({...common,prev_trans_lt:undefined,account:{address:RAW},utime:102,aborted:false,success:true},"tonapi"));
 // Network fixtures: exercise sync without downloading live data.
 const apiTx=x=>({account:RAW,hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,now:x.t,description:{aborted:false}});
+const tonapiTx=x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true});
 const originalFetch=globalThis.fetch;
 let requests=[];
-const install=handler=>{requests=[];globalThis.fetch=async input=>{const u=new URL(input);requests.push(u);return {ok:true,json:async()=>({transactions:handler(u).map(apiTx)})}}};
+const install=handler=>{requests=[];globalThis.fetch=async input=>{const u=new URL(input);requests.push(u);return {ok:true,json:async()=>({transactions:handler(u).map(u.hostname==="tonapi.io"?tonapiTx:apiTx)})}}};
 try{
  const prev=cacheFrom(t.slice(0,2),"toncenter");
  install(u=>u.searchParams.has("start_lt")?[t[2]]:[...t].reverse());
@@ -46,6 +47,33 @@ try{
  const newer={h:hash(4),lt:"4",prev:"3",prevHash:hash(3),t:104,success:true,m:null};
  globalThis.fetch=async()=>({ok:true,json:async()=>({transactions:[newer,...t.slice().reverse()].map(x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true}))})});
  assert.equal((await crossCheck(c)).status,"match");
+ // Same-tip disagreement is reported even if the alternate chain is incomplete.
+ const bad={...t[1],h:hash(9)};
+ install(()=>[t[2],bad,t[0]]);
+ assert.equal((await crossCheck(c)).status,"mismatch");
+ // A good fallback must not conceal a contradiction from the primary.
+ install(u=>u.hostname==="tonapi.io"?[t[2]]:[{...t[2],prevHash:hash(9)}]);
+ const fallback=await sync(prev);
+ assert.ok(compareSnapshots(fallback,c));
+ assert.equal(auditTrust(fallback),"mismatch");
+ // When neither source can safely extend history, preserve an actionable audit.
+ install(()=>[{...t[2],prevHash:hash(9)}]);
+ await assert.rejects(()=>sync(prev),e=>e.audit?.status==="mismatch"&&e.audit.tip===prev.tip);
+ // Missing/gapped history and conflicting duplicates are rejected.
+ install(()=>[t[2],t[0]]);
+ assert.equal((await crossCheck(c)).status,"unavailable");
+ install(()=>[t[2],{...t[2],prevHash:hash(9)},t[1],t[0]]);
+ await assert.rejects(()=>crossCheck(c),/Conflicting duplicate/);
+ // Unavailable primary API falls back to the alternate source without a false mismatch.
+ globalThis.fetch=async input=>{
+  const u=new URL(input);
+  if(u.hostname!=="tonapi.io")return {ok:false,status:403};
+  return {ok:true,json:async()=>({transactions:[t[2]].map(tonapiTx)})};
+ };
+ const recovered=await sync(prev);
+ assert.ok(compareSnapshots(recovered,c));
+ assert.equal(auditTrust(recovered),"unchecked");
+
 }finally{globalThis.fetch=originalFetch}
 // Trust and concurrency: a legacy match is not a full-history match.
 const match={...auditResult(c,"match"),asOf:Date.now()-4000};
@@ -61,4 +89,6 @@ const advanced=cacheFrom([{h:hash(4),lt:"4",prev:"3",prevHash:hash(3),t:104,succ
 assert.equal(auditTrust({...advanced,audit:match}),"prior");
 assert.equal(auditTrust({...advanced,audit:mergeAudit(advanced,mismatch)}),"mismatch");
 assert.equal(auditTrust({...c,audit:{...match,tipHash:hash(9)}}),"unavailable");
+assert.equal(historyConflict(c,advanced),false);
+assert.equal(historyConflict(c,cacheFrom(changed,"tonapi")),true);
 console.log("P1 identity regression checks passed");
