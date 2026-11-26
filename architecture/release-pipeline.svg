@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 855" width="760" height="855" role="img" aria-labelledby="title desc"><title id="title">Snapshot &amp; release pipeline</title><desc id="desc">Independent GitHub Actions workflows</desc><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0L8 4L0 8Z" fill="#aab3ac"/></marker><marker id="green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0L8 4L0 8Z" fill="#b5ef58"/></marker><marker id="teal" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0L8 4L0 8Z" fill="#71c5b3"/></marker><marker id="amber" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0L8 4L0 8Z" fill="#e7be78"/></marker></defs>
+<rect x="1" y="1" width="758" height="853" rx="20" fill="#101211" stroke="#343c35" stroke-width="1.5"/>
+<text x="28" y="39" fill="#b5ef58" font-size="15" font-weight="700" text-anchor="start" font-family="Arial, Helvetica, sans-serif">PEPEGUN ANALYTICS</text>
+<text x="28" y="76" fill="#edf1ee" font-size="29" font-weight="700" text-anchor="start" font-family="Arial, Helvetica, sans-serif">Snapshot &amp; release pipeline</text>
+<text x="28" y="102" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="start" font-family="Arial, Helvetica, sans-serif">Independent GitHub Actions workflows</text>
+<rect x="26" y="125" width="348" height="522" rx="14" fill="#171a18" stroke="#343c35" stroke-width="1.5"/>
+<text x="46" y="156" fill="#71c5b3" font-size="18" font-weight="700" text-anchor="start" font-family="Arial, Helvetica, sans-serif">01  HISTORY</text>
+<rect x="386" y="125" width="348" height="522" rx="14" fill="#171a18" stroke="#343c35" stroke-width="1.5"/>
+<text x="406" y="156" fill="#b5ef58" font-size="18" font-weight="700" text-anchor="start" font-family="Arial, Helvetica, sans-serif">02  CODE VERIFICATION</text>
+<rect x="42" y="174" width="316" height="76" rx="10" fill="#1d211e" stroke="#aab3ac" stroke-width="1.5"/>
+<text x="200" y="204" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Schedule / manual</text>
+<text x="200" y="228" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Relevant data-code changes</text>
+<rect x="402" y="174" width="316" height="76" rx="10" fill="#1d211e" stroke="#aab3ac" stroke-width="1.5"/>
+<text x="560" y="204" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Pull request / push</text>
+<text x="560" y="228" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Changes to code and tests</text>
+<path d="M200 250V277" fill="none" stroke="#71c5b3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#teal)"/>
+<path d="M560 250V277" fill="none" stroke="#b5ef58" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#green)"/>
+<rect x="42" y="280" width="316" height="76" rx="10" fill="#1d211e" stroke="#71c5b3" stroke-width="1.5"/>
+<text x="200" y="310" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">scripts/snapshot.mjs</text>
+<text x="200" y="334" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Toncenter / TonAPI</text>
+<rect x="402" y="280" width="316" height="76" rx="10" fill="#1d211e" stroke="#71c5b3" stroke-width="1.5"/>
+<text x="560" y="310" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Node.js tests</text>
+<text x="560" y="334" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Read-only live checks</text>
+<path d="M200 356V383" fill="none" stroke="#71c5b3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#teal)"/>
+<path d="M560 356V383" fill="none" stroke="#b5ef58" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#green)"/>
+<rect x="42" y="386" width="316" height="76" rx="10" fill="#1d211e" stroke="#71c5b3" stroke-width="1.5"/>
+<text x="200" y="416" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">History validation</text>
+<text x="200" y="440" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Independent indexer audit</text>
+<rect x="402" y="386" width="316" height="76" rx="10" fill="#1d211e" stroke="#71c5b3" stroke-width="1.5"/>
+<text x="560" y="416" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Chromium + WebKit</text>
+<text x="560" y="440" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">UI · CSP · Exports</text>
+<path d="M200 462V489" fill="none" stroke="#71c5b3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#teal)"/>
+<path d="M560 462V489" fill="none" stroke="#b5ef58" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#green)"/>
+<rect x="42" y="492" width="316" height="76" rx="10" fill="#1d211e" stroke="#e7be78" stroke-width="1.5"/>
+<text x="200" y="522" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Snapshot tests</text>
+<text x="200" y="546" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Validate before publishing</text>
+<rect x="402" y="492" width="316" height="76" rx="10" fill="#1d211e" stroke="#e7be78" stroke-width="1.5"/>
+<text x="560" y="522" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Baseline comparison</text>
+<text x="560" y="546" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Regression verification</text>
+<path d="M200 568V586" fill="none" stroke="#71c5b3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#teal)"/>
+<rect x="42" y="589" width="316" height="46" rx="10" fill="#1d211e" stroke="#b5ef58" stroke-width="1.5"/>
+<text x="200" y="619" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">docs/snapshot.json</text>
+<text x="560" y="615" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Passing checks before PR merge</text>
+<path d="M200 635V668H380V688" fill="none" stroke="#71c5b3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#teal)"/>
+<path d="M560 647V668H380" fill="none" stroke="#b5ef58" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 6"/>
+<rect x="210" y="690" width="340" height="64" rx="10" fill="#1d211e" stroke="#b5ef58" stroke-width="1.5"/>
+<text x="380" y="720" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">main branch</text>
+<text x="380" y="744" fill="#aab3ac" font-size="16" font-weight="400" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Versioned code and public snapshot</text>
+<path d="M380 754V769H200V782" fill="none" stroke="#b5ef58" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#green)"/>
+<path d="M380 769H560V782" fill="none" stroke="#b5ef58" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#green)"/>
+<rect x="42" y="784" width="316" height="54" rx="10" fill="#1d211e" stroke="#b5ef58" stroke-width="1.5"/>
+<text x="200" y="818" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">GitHub Pages</text>
+<rect x="402" y="784" width="316" height="54" rx="10" fill="#1d211e" stroke="#71c5b3" stroke-width="1.5"/>
+<text x="560" y="818" fill="#edf1ee" font-size="21" font-weight="600" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">Raw GitHub snapshot</text>
+</svg>
