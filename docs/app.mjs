@@ -1,4 +1,4 @@
-import {setupCardExport} from "./card-export.mjs?v=30";
+import {setupCardExport} from "./card-export.mjs?v=38";
 import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=35";
 import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=35";
 const words={
@@ -631,5 +631,9 @@ $("audit-check").addEventListener("click",auditSources);$("refresh").addEventLis
 window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(renderCharts,100)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!busy&&(!cache||Date.now()-cache.asOf>=REFRESH))refresh()});
 setInterval(()=>{if(!busy&&document.visibilityState==="visible")refresh()},REFRESH);setInterval(updateStatus,60000);
-const updateCardExport=setupCardExport(()=>({valid:!!m&&!!cache,lang,period:rangeNote(),asOf:cache?time(cache.asOf):"",anchor:m?.anchor||"",stale:stale(),trust:trustLabel()?tr(trustLabel()):"",suspect:auditTrust(cache)==="mismatch"}),download);
+const updateCardExport=setupCardExport(()=>{
+ const trust=auditTrust(cache),warning=trust==="match"||trust==="prior"?"":trustLabel(trust);
+ const anchor=m?.anchor||"";
+ return {valid:!!m&&!!cache,lang,period:rangeNote(),anchor,activePeriod:anchor?(lang==="ru"?"На ":"As of ")+utcDate(Date.parse(anchor+"T00:00:00Z"),true):"",calendarCaption:lang==="ru"?"Календарные дни":"Calendar days",stale:stale(),warning:warning?tr(warning):""};
+},download);
 render();loadCache().then(c=>{if(c){cache=c;render()}busy=false;refresh()}).catch(()=>{busy=false;refresh()});
