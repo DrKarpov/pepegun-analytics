@@ -77,8 +77,9 @@ export function historyConflict(a,b){
  return false;
 }
 function overlapConflict(previous,txs){
- const known=new Map(previous.history||[[previous.tip,previous.tipHash]]);
- return txs.some(t=>known.has(t.lt)&&known.get(t.lt)!==t.h);
+ const history=previous.history;
+ const known=new Map((history||[[previous.tip,previous.tipHash]]).map(([lt,h],i)=>[lt,{h,prev:history?(history[i-1]?.[0]||"0"):null,prevHash:history?(history[i-1]?.[1]||ZERO_HASH):null}]));
+ return txs.some(t=>{const row=known.get(t.lt);return !!row&&(row.h!==t.h||(row.prev!==null&&t.prev!==row.prev)||(row.prevHash!==null&&t.prevHash!=null&&t.prevHash!==row.prevHash))});
 }
 
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -192,9 +193,9 @@ export async function sync(previous,progress,force=false){
     }
    }
    const txs=await download(source,null,progress);
+   if(validCache(previous)&&overlapConflict(previous,txs))throw conflict("Indexer disagrees with cached history");
    if(!verify(txs,"0"))throw Error("Incomplete or empty full history");
    if(validCache(previous)){
-    if(overlapConflict(previous,txs))throw conflict("Indexer disagrees with cached history");
     const anchor=txs.find(t=>t.lt===previous.tip);
     if(!anchor){if(compareLt(txs.at(-1).lt,previous.tip)>=0)throw conflict("Indexer omitted cached tip");throw Error("Indexer behind cached snapshot")}
     if(previous.history&&!sameHistory(previous.history,txs.filter(t=>compareLt(t.lt,previous.tip)<=0).map(t=>[t.lt,t.h])))throw conflict("Indexer disagrees with cached history");
