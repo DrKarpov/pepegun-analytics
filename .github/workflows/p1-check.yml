@@ -8,7 +8,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -23,3 +23,16 @@ jobs:
           node tests/snapshot.test.mjs
       - name: Verify live provider samples (read-only)
         run: node scripts/check-providers.mjs
+      - name: Install browser test tools
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts playwright@1.51.1
+          npx playwright install --with-deps chromium webkit
+      - name: Verify dashboard in Chromium and WebKit
+        run: node tests/p1-browser.test.mjs
+      - name: Save browser screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p1-browser-screenshots
+          path: browser-artifacts/
+          if-no-files-found: ignore
