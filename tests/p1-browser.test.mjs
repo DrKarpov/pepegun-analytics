@@ -245,21 +245,24 @@ try{
    await legacyPage.locator("#card-export-menu").waitFor({state:"hidden"});
    await migration.close();
    // P2-05: a wallet active on consecutive days produces returning bars
-   // in a complete interval and the incomplete current UTC day.
+   // in a complete interval and the incomplete current UTC bucket.
    const contrastCtx=await browser.newContext({viewport:{width:393,height:852},locale:"en-US",acceptDownloads:true});
-   const day=Math.floor(now/86400000)*86400;
-   const contrastTxs=[day-172800+60,day-86400+60,day].map((t,i)=>({...txs[i],t,m:{...txs[i].m,s:txs[0].m.s}}));
-   const contrastCache=cacheFrom(contrastTxs,"toncenter",null,now);
-   const contrastSeed={...snapshot,transactions:contrastTxs.map(packTransaction),audit:{...snapshot.audit,tip:contrastCache.tip,tipHash:contrastCache.tipHash}};
+   // Fix the browser clock within a 3-hour bucket. The midnight transaction
+   // in the original fixture was in a COMPLETE bucket by the evening run.
+   const day=Math.floor(now/86400000)*86400,contrastNow=(day+13*3600)*1000;
+   const contrastTxs=[day-172800+60,day-86400+60,day+12*3600+60].map((t,i)=>({...txs[i],t,m:{...txs[i].m,s:txs[0].m.s}}));
+   const contrastCache=cacheFrom(contrastTxs,"toncenter",null,contrastNow);
+   const contrastSeed={...snapshot,asOf:contrastNow,transactions:contrastTxs.map(packTransaction),audit:{...snapshot.audit,asOf:contrastNow,tip:contrastCache.tip,tipHash:contrastCache.tipHash}};
    await contrastCtx.route("https://raw.githubusercontent.com/**/snapshot.json*",route=>route.fulfill({json:contrastSeed}));
    await contrastCtx.route("https://toncenter.com/**",route=>{
     const u=new URL(route.request().url());
     return ok(route,u.searchParams.has("start_lt")?[]:u.searchParams.get("limit")==="1"?[tc(contrastTxs.at(-1))]:contrastTxs.slice().reverse().map(tc));
    });
    const contrastPage=await contrastCtx.newPage();
+   await contrastPage.clock.setFixedTime(new Date(contrastNow));
    await contrastPage.goto(url);await contrastPage.locator("#startup-screen").waitFor({state:"detached"});
    await contrastPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
-   const returnColor="#607367",background=[23,26,24],foreground=[96,115,103];
+   const background=[23,26,24],foreground=[96,115,103];
    const lum=rgb=>rgb.map(n=>{n/=255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
    const ratio=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
    const mixed=foreground.map((n,i)=>Math.round(.92*n+.08*background[i]));
