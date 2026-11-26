@@ -565,7 +565,7 @@ async function refresh(force=false){
  if(busy)return;
  busy=true;error=false;progress=null;exportError=false;updateStatus();
  try{const next=await sync(cache,p=>{progress=p;updateStatus()},force);cache={...next,audit:mergeAudit(next,cache?.audit)};storageError=!(await saveCache(cache));}
- catch(e){error=true;console.warn("Pepegun sync:",e)}
+ catch(e){error=true;if(cache&&e.audit){cache={...cache,audit:mergeAudit(cache,e.audit)};storageError=!(await saveCache(cache))}console.warn("Pepegun sync:",e)}
  finally{busy=false;render()}
 }
 $("language").addEventListener("click",()=>{lang=lang==="ru"?"en":"ru";try{localStorage.setItem("pepegun-lang",lang)}catch{}render()});
