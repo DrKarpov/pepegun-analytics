@@ -33,7 +33,7 @@ assert.equal(verify([mapTx({...genesisRaw,hash:hash(2),lt:"2"},"tonapi")],"1",ha
 assert.throws(()=>mapTx({account:RAW,hash:hash(1),lt:"1",now:101,description:{aborted:true}},"toncenter"));
 // Network fixtures: exercise sync without downloading live data.
 const apiTx=x=>({account:RAW,hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,now:x.t,description:{aborted:false}});
-const tonapiTx=x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true});
+const tonapiTx=x=>({account:{address:RAW},hash:x.h,lt:x.lt,prev_trans_lt:x.prev,prev_trans_hash:x.prevHash,utime:x.t,aborted:false,success:true,...(x.m?{in_msg:{source:{address:x.m.s},value:x.m.v,bounced:x.m.b,decoded_op_name:"text_comment",decoded_body:{text:x.m.c}}}:{})});
 const originalFetch=globalThis.fetch;
 let requests=[];
 const install=handler=>{requests=[];globalThis.fetch=async input=>{const u=new URL(input);requests.push(u);return {ok:true,json:async()=>({transactions:handler(u).map(u.hostname==="tonapi.io"?tonapiTx:apiTx)})}}};
@@ -195,6 +195,28 @@ try{
  const expected=cacheFrom([different],"toncenter",c);
  install(()=>[tail]);
  assert.equal((await crossCheck(expected,undefined,{checkpoint})).status,"mismatch");
+ // Positive classification and ambiguous-count preservation, including public
+ // packed snapshot round-trip. Proof must bind row values, not just tip hash.
+ const feeTx={...t[0],m:{s:"0:"+hash(500),v:"100",b:false,c:"Pepegun fee · STON.fi"}};
+ const ambiguousTx={...t[1],m:{s:"0:"+hash(501),v:"101",b:false,c:"Pepegun uncertain"}};
+ const labelled=[feeTx,ambiguousTx,t[2]],labelledCache=cacheFrom(labelled,"toncenter");
+ install(()=>labelled.slice().reverse());
+ const labelledProof=await crossCheck(labelledCache);
+ assert.equal(labelledProof.status,"match");assert.equal(labelledCache.ambiguous,1);
+ const packedCache=cacheFrom(labelled.map(x=>unpackTransaction(packTransaction(x))),"toncenter",null,labelledCache.asOf);
+ const packedCheckpoint={...packedCache,audit:labelledProof};
+ const freshFee={...tail,m:{s:"0:"+hash(502),v:"200",b:false,c:"Pepegun fee · DeDust"}};
+ const withFee=cacheFrom([freshFee],"toncenter",labelledCache);
+ install(()=>[freshFee]);
+ assert.equal((await crossCheck(withFee,undefined,{checkpoint:packedCheckpoint})).method,"incremental");
+ const freshAmbiguous={...tail,m:{s:"0:"+hash(502),v:"200",b:false,c:"Pepegun uncertain"}};
+ const withAmbiguous=cacheFrom([freshAmbiguous],"toncenter",labelledCache);
+ install(()=>[freshAmbiguous]);
+ assert.equal((await crossCheck(withAmbiguous,undefined,{checkpoint:packedCheckpoint})).method,"incremental");
+ assert.equal(withAmbiguous.ambiguous,2);
+ const corrupt={...packedCheckpoint,rows:packedCheckpoint.rows.map(r=>({...r,v:"999"}))};
+ install(()=>labelled.slice().reverse());
+ assert.equal((await crossCheck(labelledCache,undefined,{checkpoint:corrupt})).method,"full");
  // Explicit/manual full check never takes the shortcut.
  install(u=>{assert.equal(u.searchParams.has("after_lt"),false);return [...t].reverse()});
  assert.equal((await crossCheck(checkpoint)).method,"full");
