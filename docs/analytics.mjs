@@ -18,7 +18,12 @@ export function mapTx(x,source){
  const im=x.in_msg,decoded=tc?im?.message_content?.decoded:im?.decoded_body;
  const isText=tc?(decoded?.type==="text_comment"||decoded?.["@type"]==="text_comment"):im?.decoded_op_name==="text_comment";
  const comment=isText?(tc?decoded?.comment:decoded?.text):null;
- const lt=unsigned(x.lt),prev=unsigned(x.prev_trans_lt);
+ // TonAPI omits both predecessor fields for the first account transaction.
+ // Treat that exact shape as the genesis sentinel; verify() still rejects it
+ // anywhere except the beginning of a complete chain. A half-missing link
+ // must not be silently accepted as genesis.
+ const genesis=!tc&&x.prev_trans_lt==null&&x.prev_trans_hash==null;
+ const lt=unsigned(x.lt),prev=genesis?"0":unsigned(x.prev_trans_lt);
  const prevHash=x.prev_trans_hash==null?null:hex(x.prev_trans_hash);
  const m=im?{s:raw(tc?im.source:im.source?.address),v:im.value==null?"0":unsigned(im.value),b:im.bounced===true,c:typeof comment==="string"?comment:null}:null;
  const success=tc?!aborted:!aborted&&x.success;
