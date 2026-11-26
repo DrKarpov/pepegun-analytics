@@ -1,7 +1,21 @@
-name: P1 integrity verification
+name: Code verification
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'docs/**'
+      - '!docs/snapshot.json'
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '!docs/snapshot.json'
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/**'
   workflow_dispatch:
 permissions:
   contents: read
