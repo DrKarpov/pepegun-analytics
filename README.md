@@ -2,7 +2,7 @@
 
 Independent community on-chain analytics for the Pepegun fee collector on TON. Not an official Pepegun product.
 
-[Open dashboard](https://drkarpov.github.io/pepegun-analytics/) · [Technical roadmap](ROADMAP.md) · [Development rules](DEVELOPMENT_RULES.md)
+[Open dashboard](https://drkarpov.github.io/pepegun-analytics/) · [Contributing](CONTRIBUTING.md) · [Project status](PROJECT_CONTEXT.md)
 
 ## Data and methodology
 
@@ -19,11 +19,9 @@ Static GitHub Pages serves `docs/`, without a server, database, runtime third-pa
 
 ### Browser runtime
 
-All analytics and rendering run in the browser. The application coordinates the data layer and the UI; no private backend is involved.
-
 ![Pepegun Analytics browser architecture](architecture/browser-runtime.svg)
 
-The diagram groups principal runtime relationships; it is not an exhaustive import graph. The presentation modules share chart styling and formatting helpers. Insights loads the seed; analytics handles API history and IndexedDB. Language preferences belong to i18n. The raw GitHub and same-origin seed contain the same published snapshot format. IndexedDB and language preference are stored on the device.
+The diagram shows principal runtime relationships, not every module import.
 
 ### Snapshot and release pipeline
 
@@ -34,7 +32,6 @@ Code verification and snapshot generation run separately in GitHub Actions. A do
 The snapshot workflow checks transaction continuity, compares indexers and runs regressions before publishing. A detected history disagreement blocks snapshot publication; provider unavailability is recorded as a distinct audit state. The browser can continue using a validated cached or published snapshot when live sources fail.
 
 ### Module responsibilities
-
 
 | File | Responsibility |
 |---|---|
@@ -48,7 +45,7 @@ The snapshot workflow checks transaction continuity, compares indexers and runs 
 | `startup-screen.mjs` | Initial presentation with reduced motion and fail-open timeout |
 | `snapshot.json`, `scripts/snapshot.mjs` | Published minimized history and snapshot generation |
 
-Version module imports and HTML asset queries when their target changes. Keep dependent versions consistent. Preserve accepted v29 layout plus later reliability and startup changes. No runtime npm dependency is required.
+No runtime npm dependency is required.
 
 ## Browser security
 
@@ -82,4 +79,4 @@ node scripts/snapshot.mjs --full-audit
 
 Code CI runs fixed regressions, read-only live source checks and Chromium/WebKit tests. The snapshot workflow is separate and does not regenerate data for UI-only changes. The P3 comparison uses the pinned P2-07 revision with identical fixed synthetic history: RU/EN, six viewport widths, visible text/SVG, computed layout/styles, screenshot comparison, exact CSV bytes, decoded PNG pixels, preview and hold presentation. Existing browser tests cover sync/failure, audit cancellation, gestures, startup, individual exports and actual CSP enforcement. Native iOS Safari, system file sharing and clipboard permission dialogs still require device acceptance; the clipboard denial fixture is not native permission testing. Screenshots are retained as CI artifacts. Live provider rate limits or transport failures can block a run; do not publish a known failing candidate.
 
-See [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) for current handoff and [AUDIT.md](AUDIT.md) for the original historical audit. The live task state is in ROADMAP.md.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development requirements and [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) for release status and remaining verification. The [archive](archive/) contains the original audit and completed roadmap.
