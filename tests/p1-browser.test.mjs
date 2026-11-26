@@ -38,7 +38,7 @@ async function waitUntil(page,predicate,arg=null,{timeout=30000,polling=50}={}){
   await new Promise(resolve=>setTimeout(resolve,polling));
  }
 }
-const waitStatus=async(page,word)=>waitUntil(word=>document.querySelector("#status-text").textContent===word&&!document.querySelector("#refresh").disabled,word,{timeout:15000});
+const waitStatus=async(page,word)=>waitUntil(page,word=>document.querySelector("#status-text").textContent===word&&!document.querySelector("#refresh").disabled,word,{timeout:15000});
 const readDownload=async(page,selector)=>{const [download]=await Promise.all([page.waitForEvent("download"),page.locator(selector).click()]);return readFile(await download.path())};
 const cardIds=["overview","active","finite","growth","activity","fees"];
 const chartIds=["growth","activity","fees"];
