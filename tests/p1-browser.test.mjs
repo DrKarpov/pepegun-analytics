@@ -29,6 +29,42 @@ const ok=(route,transactions)=>route.fulfill({status:200,contentType:"applicatio
 const deny=route=>route.fulfill({status:403,body:"offline"});
 const waitStatus=async(page,word)=>page.waitForFunction(word=>document.querySelector("#status-text").textContent===word&&!document.querySelector("#refresh").disabled,word,{timeout:15000});
 const readDownload=async(page,selector)=>{const [download]=await Promise.all([page.waitForEvent("download"),page.locator(selector).click()]);return readFile(await download.path())};
+const cardIds=["overview","active","finite","growth","activity","fees"];
+const chartIds=["growth","activity","fees"];
+// Collect the actual canvas text without replacing the native rendering.
+async function recordCardText(page){
+ await page.evaluate(()=>{
+  if(!window.__recordCardText){
+   const original=CanvasRenderingContext2D.prototype.fillText;
+   CanvasRenderingContext2D.prototype.fillText=function(...args){window.__cardText.push({text:String(args[0]),color:String(this.fillStyle),x:args[1],y:args[2]});return original.apply(this,args)};
+   window.__recordCardText=true;
+  }
+  window.__cardText=[];
+ });
+}
+async function exportCard(page,id,{download=true,pixels=false}={}){
+ await recordCardText(page);
+ const card=page.locator('[data-card-export="'+id+'"]');
+ await card.focus();await page.keyboard.press("Enter");
+ await page.waitForFunction(()=>!document.querySelector("#card-export-download").disabled);
+ const entries=await page.evaluate(()=>window.__cardText);
+ const preview=pixels?await page.locator("#card-export-preview").evaluate(e=>e.toDataURL()):null;
+ if(download){
+  const png=await readDownload(page,"#card-export-download");
+  assert.equal(png.subarray(1,4).toString(),"PNG");
+  if(pixels){
+   const result=await page.evaluate(async({preview,png})=>{
+    const decode=async src=>{const img=new Image();img.src=src;await img.decode();const c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;const ctx=c.getContext("2d");ctx.drawImage(img,0,0);return {width:c.width,height:c.height,data:ctx.getImageData(0,0,c.width,c.height).data}};
+    const a=await decode(preview),b=await decode("data:image/png;base64,"+png);
+    return a.width===b.width&&a.height===b.height&&a.data.every((v,i)=>v===b.data[i]);
+   },{preview,png:png.toString("base64")});
+   assert.equal(result,true,id+" preview and downloaded PNG pixels differ");
+  }
+ }else await page.keyboard.press("Escape");
+ await page.locator("#card-export-menu").waitFor({state:"hidden"});
+ return entries;
+}
+
 try{
  for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
   const browser=await engine.launch({headless:true});
@@ -79,6 +115,23 @@ try{
    assert.equal(await page.locator(".page").evaluate(e=>getComputedStyle(e).visibility),"visible");
    await page.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
    mode="prior";await page.locator("#refresh").click();await waitStatus(page,"Earlier history checked");assert.equal(await startup.count(),0);
+   // P2-06: prior-history status stays on the site but not on any individual PNG.
+   await page.locator('[data-range="7d"]').click();
+   for(const lang of ["en","ru"]){
+    if(await page.locator("html").getAttribute("lang")!==lang)await page.locator("#language").click();
+    await waitStatus(page,lang==="ru"?"Проверена ранняя история":"Earlier history checked");
+    for(const id of cardIds){
+     const entries=await exportCard(page,id,{download:false});
+     const all=entries.map(e=>e.text).join(" ");
+     assert.doesNotMatch(all,/Earlier history checked|Проверена ранняя история/);
+     assert.doesNotMatch(all,/Saved data|Сохранённые данные|Cached data/);
+     const green=entries.filter(e=>e.color==="#b5ef58"&&e.y<100).map(e=>e.text).join(" ");
+     assert.ok(green.length>0,id+" missing period");
+     assert.doesNotMatch(green,/Earlier history checked|Проверена ранняя история/);
+    }
+   }
+   if(await page.locator("html").getAttribute("lang")!=="en")await page.locator("#language").click();
+   await page.locator('[data-range="all"]').click();
    mode="mismatch";await page.locator("#refresh").click();await waitStatus(page,"Sources disagree");
    assert.equal(await page.locator("#status").getAttribute("class"),"status error");
    const before=await page.locator("#overview").innerText();
@@ -303,6 +356,43 @@ try{
     assert.deepEqual(await pixelCounts(activityPng.toString("base64")),previewColors,name+" "+lang+" downloaded PNG matches preview color counts");
     await contrastPage.locator("#card-export-menu").waitFor({state:"hidden"});
    }
+
+   // P2-06: fixed clock allows exact expectations for rolling/calendar/custom
+   // periods and the active-card range-end anchor in both languages.
+   const dateAt=(seconds,lang)=>new Intl.DateTimeFormat(lang==="ru"?"ru-RU":"en-US",{timeZone:"UTC",day:"numeric",month:"short",year:"numeric"}).format(new Date(seconds*1000)).replace(/\s+/g," ");
+   for(const lang of ["en","ru"]){
+    if(await contrastPage.locator("html").getAttribute("lang")!==lang)await contrastPage.locator("#language").click();
+    for(const preset of ["6h","7d","30d","custom"]){
+     await contrastPage.locator('[data-range="'+preset+'"]').click();
+     if(preset==="custom"){
+      const d=new Date((day-86400)*1000).toISOString().slice(0,10);
+      await contrastPage.locator("#from").fill(d);await contrastPage.locator("#to").fill(d);
+      await contrastPage.locator("#to").dispatchEvent("change");
+     }
+     const activeDate=dateAt(preset==="custom"?day-86400:day,lang);
+     const currentRange=(await contrastPage.locator("#range-note").innerText()).replace(/\s*·\s*UTC$/,"").replace(/\s+/g," ");
+     for(const id of cardIds){
+      const entries=await exportCard(contrastPage,id,{pixels:preset==="6h"});
+      const all=entries.map(e=>e.text).join(" ");
+      const green=entries.filter(e=>e.color==="#b5ef58"&&e.y<100).map(e=>e.text).join(" ");
+      const utcCount=(all.match(/\bUTC\b/g)||[]).length;
+      assert.doesNotMatch(all,/Earlier history checked|Проверена ранняя история|Sources disagree|Источники расходятся|Awaiting cross-check|Ожидается сверка/);
+      if(id==="active"){
+       assert.equal(green,(lang==="ru"?"На ":"As of ")+activeDate);
+       assert.equal(utcCount,0);
+       assert.ok(all.includes(lang==="ru"?"Календарные дни":"Calendar days"));
+      }else if(preset==="6h"){
+       assert.equal(green,currentRange+" UTC");
+       assert.equal(utcCount,1);
+      }else{
+       assert.equal(green,currentRange);
+       const expected=chartIds.includes(id)&&preset!=="30d"?1:0;
+       assert.equal(utcCount,expected,id+" "+preset+" "+lang+" UTC count");
+       if(expected)assert.match(all,/\d{1,2}:\d{2} UTC\b/);
+      }
+     }
+    }
+   }
    await contrastCtx.close();
    // Failure and reduced-motion: normal application error must remain usable.
    const offline=await browser.newContext({viewport:{width:393,height:852},reducedMotion:"reduce"});
@@ -333,7 +423,7 @@ try{
    await nojs.close();
    assert.deepEqual(errors,[]);
    await ctx.close();
-   console.log(name,"Trust states, bilingual viewports, CSV/PNG, audit cancellation, startup screen, chart gestures and returning contrast verified");
+   console.log(name,"Trust states, bilingual viewports, CSV/PNG, audit cancellation, startup screen, chart gestures, returning contrast and all card export labels verified");
   }finally{await browser.close()}
  }
 }finally{server.close()}
