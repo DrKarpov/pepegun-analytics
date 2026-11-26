@@ -301,3 +301,13 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
  .advanced-grid>div{grid-row:span 2;grid-template-rows:subgrid}
  .return-grid>div{grid-row:span 3;grid-template-rows:subgrid}
 }
+
+/* v16: explicit single-column alignment for detailed metric cards. */
+.advanced-grid{column-gap:10px}
+.advanced-grid>div{grid-template-columns:minmax(0,1fr);justify-items:stretch;text-align:center;min-width:0}
+.advanced-grid>div>span,.advanced-grid>div>strong{width:100%;min-width:0;text-align:center;overflow-wrap:anywhere;align-self:center}
+.return-grid{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
+.return-grid>div{grid-row:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(2.8em,auto) auto minmax(1.4em,auto);align-content:center;align-items:center;justify-content:stretch;justify-items:stretch;gap:4px;min-width:0;text-align:center}
+.return-grid>div>span,.return-grid>div>strong,.return-grid>div>small{display:block;width:100%;min-width:0;text-align:center;align-self:center;justify-self:stretch;margin:0}
+.return-grid>div>strong{line-height:1.2}
+@media(max-width:350px){.return-grid>div{padding-inline:4px}.return-grid>div>strong{font-size:16px}}

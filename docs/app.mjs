@@ -99,7 +99,7 @@ const words={
       "Refresh runs on page open, manually, every 15 minutes while the page is open, and when returning to an old tab. The browser retains the last verified history; a public daily snapshot accelerates first load; no paid API is used. Availability depends on public blockchain indexers."
     ],
     "median": "Median fee",
-    "perPayer": "Fees per paying wallet",
+    "perPayer": "Fees per payer",
     "top5": "Top 5 share of fees",
     "top10": "Top 10 share of fees",
     "newPayers": "New paying wallets",
@@ -249,7 +249,7 @@ const words={
       "Обновление при открытии, вручную, каждые 15 минут на открытой странице и при возврате в давно открытую вкладку. Браузер хранит последнюю проверенную историю; ежедневный публичный снимок ускоряет загрузку; платный API не используется. Доступность зависит от публичных индексаторов блокчейна."
     ],
     "median": "Медианная комиссия",
-    "perPayer": "Комиссии на платящий кошелёк",
+    "perPayer": "Комиссии на плательщика",
     "top5": "Доля комиссий топ-5",
     "top10": "Доля комиссий топ-10",
     "newPayers": "Новые платящие кошельки",
