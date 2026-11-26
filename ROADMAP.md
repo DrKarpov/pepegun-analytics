@@ -1,14 +1,14 @@
 # Pepegun Analytics — technical roadmap
 
-Updated 2026-11-26. Baseline: v29, commit 6eedcb502bddc08581e9a0d269e55ce1b3721a08; latest main at documentation preparation: 07e46d4414a2ee735eee75b72ff6efe152a35fd2 (snapshot-only updates may follow).
+Updated 2026-11-26. Baseline: v29, commit 6eedcb502bddc08581e9a0d269e55ce1b3721a08; latest main at P2-07 start: d012727dfc8a88f7c611ec54c84952136303a168 (snapshot-only updates may follow).
 
 Goal: strengthen reliability and maintainability without redesigning the approved dashboard or introducing paid infrastructure. This roadmap preserves the 15 tasks from the v28 audit. Documentation handoff is not implementation progress.
 
 ## Status and resume pointer
 
 - Cosmetic phase v29: complete. P1 and P2-01/02 merged, tested with real complete history and both browsers. Recovery of the erroneous unavailable status merged in d6c8042; user confirmed “Обновлено” on the live site. Automatic snapshot generation subsequently published a full match (5ebb7f9 and f261e52). Startup presentation outside roadmap merged in 2f9a5b3 after CI 45889000113; production rendering not independently checked.
-- Progress: 9 / 15 implemented and verified; 6 remain (browser coverage for P3-04 partially implemented).
-- Next: P2-06 in work/p2-06-export-labels. Code/tests checkpoint c6707d33b081b32153ae9a4f233cc9d49b171693. Individual PNGs omit routine verified/prior-history status; actual mismatch, unavailable/unchecked and stale warnings remain on a separate amber line. Green line is period only, with active card anchored at range-end calendar date. Single UTC beside a clock, none for date-only card. Site trust status, global PNG and CSV unchanged. Browser CI pending; then P2-07.
+- Progress: 10 / 15 implemented and verified; 5 remain (browser coverage for P3-04 partially implemented).
+- Next: P2-07 in work/p2-07-csp; code/test checkpoint 1daa072f1d2467cc24411a868a842bb16cfd4467. Early meta CSP: default deny, self scripts, self styles + inline attributes, self/blob images, self + Toncenter + TonAPI + exact raw snapshot fetch path. Block inline/foreign scripts, arbitrary network/images, base changes, objects, frames, workers and forms; no data images/eval. Legacy style-src fallback permits inline style; meta cannot enforce frame-ancestors or report-only. Actual browser enforcement/fallback/export and existing regressions pending CI. Then P3; prioritize P3-04 coverage before visual/refactor work.
 - State vocabulary: TODO, IN PROGRESS, BLOCKED, VERIFIED (branch), DONE (main + verification). A code change without required tests is not DONE.
 
 ## Stage 1 — P1: data reliability (4/4)
@@ -22,7 +22,7 @@ Goal: strengthen reliability and maintainability without redesigning the approve
 
 Stage gate: evidence-backed source contracts, migration and failure handling, metric reconciliation against a fixed snapshot, reviewed diff, successful CI and documented residual limitations. Do not publish a new schema that breaks existing deployed clients.
 
-## Stage 2 — P2: performance, resilience, UX, security (5/7)
+## Stage 2 — P2: performance, resilience, UX, security (6/7)
 
 | ID | Task | Acceptance criteria | Dependencies | Status |
 |---|---|---|---|---|
@@ -31,8 +31,8 @@ Stage gate: evidence-backed source contracts, migration and failure handling, me
 | P2-03 | Optimize repeated indexer checks | Incremental verification from an agreed checkpoint, full fallback and manual full audit; no weakened integrity, respect API limits. | P1-01/03, P2-02 | DONE |
 | P2-04 | Prevent accidental chart selection while scrolling | Vertical swipe does not select a point; intentional tap/drag, mouse and keyboard still work; long press export unaffected. | Stage 1 gate | DONE |
 | P2-05 | Improve returning-wallet graph contrast | At least 3:1 on relevant adjacent background, same restrained palette; consistency on live chart and both exports. | Stage 1 gate | DONE |
-| P2-06 | Clarify PNG time and activity scopes | All six individual cards RU/EN: accurate range/anchor; UTC once beside actual time, never beside date-only label; omit routine prior-history status; retain material trust/stale warnings separately; no timestamp/footer restoration; preview equals PNG. | Stage 1 gate | IN PROGRESS |
-| P2-07 | Add CSP | Restrict resource/network origins, maintain required API and snapshot fallback, canvas/SVG/blob exports, inline dynamic style compatibility; verify in browser. | Stage 1 gate | TODO |
+| P2-06 | Clarify PNG time and activity scopes | All six individual cards RU/EN: accurate range/anchor; UTC once beside actual time, never beside date-only label; omit routine prior-history status; retain material trust/stale warnings separately; no timestamp/footer restoration; preview equals PNG. | Stage 1 gate | DONE |
+| P2-07 | Add CSP | Restrict resource/network origins, maintain required API and snapshot fallback, canvas/SVG/blob exports, inline dynamic style compatibility; verify in browser. | Stage 1 gate | IN PROGRESS |
 
 Stage gate: source integrity retained, no paid infrastructure, no visual redesign, tested failure paths and key interactions; actual browser checks or explicit blocker.
 
@@ -81,6 +81,9 @@ Test infrastructure can be introduced earlier to protect P1/P2. Stage numbering 
 
 | 2026-11-26 | P2-04 verified, merged and accepted | [c692e4a](https://github.com/drkarpov/pepegun-analytics/commit/c692e4ae906215ba25e6ad3c117753aa4583254a), [user acceptance record](https://github.com/drkarpov/pepegun-analytics/pull/7#issuecomment-7202971776) | [CI 45891943109](https://github.com/drkarpov/pepegun-analytics/actions/runs/45891943109) passed Node, full 3738/3446 and incremental 1 request vs 38, three chart gestures, native Chromium scroll, both browsers' taps and export. User confirmed live version works. | DONE. Native iOS file sharing remains separate. |
 | 2026-11-26 | P2-05 candidate | [a15ec74](https://github.com/drkarpov/pepegun-analytics/commit/a15ec7418dd06f24174c189a86655f7e4d21ead9) | Computed returning contrast 3.46:1 opaque, 3.13:1 composited incomplete vs card; 3.07:1 opaque against live new-wallet lime. Added deterministic repeated-wallet fixtures and SVG/actual global and individual PNG pixel checks RU/EN. CI pending. | Single shared returning shade and returning-only partial opacity. No unrelated CSS/modal/metric changes. App cache v37. |
+
+| 2026-11-26 | P2-06 verified and merged | [d012727](https://github.com/drkarpov/pepegun-analytics/commit/d012727dfc8a88f7c611ec54c84952136303a168) | [CI 45895586596](https://github.com/drkarpov/pepegun-analytics/actions/runs/45895586596) passed Node, full 3738/3446, incremental 2 vs 38 requests, both browsers, six-card RU/EN periods, warning and exact preview/download pixel checks. Earlier CI failures: helper name shadowing and close-event synchronization; fixed in 4b40eda and f2adb73. | DONE in main; live iPhone confirmation not received. Individual routine prior status omitted; material warnings retained. |
+| 2026-11-26 | P2-07 candidate | [1daa072](https://github.com/drkarpov/pepegun-analytics/commit/1daa072f1d2467cc24411a868a842bb16cfd4467) | Added actual CSP meta and both-browser enforcement/fallback tests; converted test-only data image decodes to blob; assert no legitimate CSP violations. CI pending. | No UI, analytics or export implementation changes. Static meta limitations and inline attribute compatibility documented. |
 
 After each work unit add an entry with exact commit, changed files or linked diff, tests actually executed and their results, blockers, and next action. Update status and resume pointer in the same commit where practical. If a task is only proposed, leave it TODO. Keep previous entries. See DEVELOPMENT_RULES.md.
 

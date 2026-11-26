@@ -19,6 +19,10 @@ Toncenter API v3 and TonAPI v2 provide public transaction history. The daily Git
 
 Wallet counts represent addresses, not individual users. Fee revenue is the total of incoming transfers marked `Pepegun fee`, not net profit or a count of trades. All amounts are in GRAM. Return rates count wallets first seen in the selected period that have a complete follow-up window and return on a later UTC day within 7, 14 or 30 days.
 
+## Browser security
+
+The static GitHub Pages document enforces Content Security Policy via an early HTML meta tag. Scripts and external stylesheets are same-origin only; inline scripts, eval, objects, frames, workers, forms and base URL changes are blocked. Inline style attributes remain permitted for dynamic chart legends and venue bars (the style-src fallback also permits inline styles on older browsers). Images are same-origin or blob URLs for SVG/PNG export. Fetch is limited to the site itself, Toncenter, TonAPI and the exact raw GitHub snapshot path. No data: image allowance or remote scripts are needed. External explorer and bot links remain ordinary navigations. GitHub Pages does not provide custom response headers here: a meta CSP cannot enforce frame-ancestors or report-only policies. This is defense in depth, not a guarantee of complete XSS protection or blockchain correctness.
+
 ## Development
 
 ```sh
