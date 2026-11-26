@@ -328,3 +328,8 @@ button:focus-visible,.chart-tx:focus-visible{outline:2px solid var(--accent);out
 #audit-progress{font-variant-numeric:tabular-nums}
 #method-section #resync{max-width:100%;white-space:normal}
 @media(prefers-reduced-motion:reduce){#audit-check.audit-running{animation:none}}
+
+/* v19: keep the bot link highlighted with the existing audit animation. */
+.footer-link.footer-bot{border:1px solid transparent;background:linear-gradient(#1a2417,#1a2417) padding-box,linear-gradient(110deg,var(--accent),var(--secondary),var(--border),var(--accent),var(--secondary),var(--accent)) border-box;background-size:100% 100%,300% 100%;animation:audit-sweep 2.4s linear infinite}
+.footer-link.footer-bot:hover{background:linear-gradient(#26351e,#26351e) padding-box,linear-gradient(110deg,var(--accent),var(--secondary),var(--border),var(--accent),var(--secondary),var(--accent)) border-box;background-size:100% 100%,300% 100%}
+@media(prefers-reduced-motion:reduce){.footer-link.footer-bot{animation:none}}

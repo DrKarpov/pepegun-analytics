@@ -36,3 +36,6 @@ Updated 2026-11-26. This file records the repository-backed context and the user
 ## v18 methodology polish and source audit
 - User approved slightly lighter existing palette for the expanded methodology panel; no method text changes. Fee collector address is on its own line (footer retains the explorer link). Full address remains visible, wrapping only if the viewport requires it.
 - Cross-check downloads full alternate-indexer history and compares the existing verified snapshot at its original tip. TonAPI uses 100 transactions per page and 1.5s pagination pauses; Toncenter uses 1000 and 1.15s. Network retries may take longer. No reduced validation or change to request throttling. The UI passes the existing progress callback, displays actual source/page/transaction counts and retry state; animated border is indeterminate, not a percentage. Existing colors and footer button shape are reused.
+
+## v19 date labels and footer
+- Removed redundant UTC from custom date input captions in EN/RU and initial HTML; UTC range annotation and all time calculations unchanged. PepeGunBot footer link uses the existing audit-sweep border animation, preserving button dimensions and reduced-motion preference. Tonviewer unchanged.
