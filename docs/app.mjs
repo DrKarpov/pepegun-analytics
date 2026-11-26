@@ -1,6 +1,6 @@
 import {setupCardExport} from "./card-export.mjs?v=30";
-import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=33";
-import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=33";
+import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=35";
+import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=35";
 const words={
   "en": {
     "subtitle": "Independent on-chain analytics",
