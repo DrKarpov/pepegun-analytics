@@ -46,4 +46,8 @@ export function validateSeed(s){
  return cacheFrom(txs,s.source,null,s.asOf);
  }catch{return null}
 }
-export async function loadSeed(){try{const r=await fetch(new URL("./snapshot.json",import.meta.url),{cache:"no-cache"});if(!r.ok)return null;return validateSeed(await r.json())}catch{return null}}
+export async function loadSeed(){
+ const urls=["https://raw.githubusercontent.com/DrKarpov/pepegun-analytics/main/docs/snapshot.json",new URL("./snapshot.json",import.meta.url)];
+ for(const url of urls){const ac=new AbortController(),timer=setTimeout(()=>ac.abort(),5000);try{const r=await fetch(url,{cache:"no-cache",signal:ac.signal});if(r.ok){const seed=validateSeed(await r.json());if(seed)return seed}}catch{}finally{clearTimeout(timer)}}
+ return null;
+}

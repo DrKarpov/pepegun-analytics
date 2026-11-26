@@ -25,7 +25,7 @@ Wallet counts represent unique addresses, not individual users. Fee revenue repr
 
 Detailed statistics include median fees, revenue per paying address, fee concentration, new payers and comparable prior periods. Source comparison runs on request against the same transaction tip. Historical USD estimates use DefiLlama daily prices when available.
 
-An optional public history snapshot can be generated with `node scripts/snapshot.mjs` and committed as `docs/snapshot.json`. The site validates it before use and checks for newer transactions. No scheduled server job is required.
+The public history snapshot is generated daily by GitHub Actions (also runnable manually). It contains normalized public account history, not estimated counters. On a first visit the dashboard validates the available snapshot before fetching newer transactions. If the snapshot is unavailable, it downloads the complete history from the indexer. To generate it locally, run `node scripts/snapshot.mjs`.
 
 ## Development
 

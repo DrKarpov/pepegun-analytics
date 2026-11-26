@@ -1,6 +1,6 @@
 import {ADDRESS,DAY,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,amount,exact,csv,sync,loadCache,saveCache} from "./analytics.mjs?v=4";
 import {crossCheck} from "./analytics.mjs?v=4";
-import {extraMetrics,previousRange,change,loadPrices,historicalUsd,loadSeed} from "./insights.mjs?v=4";
+import {extraMetrics,previousRange,change,loadPrices,historicalUsd,loadSeed} from "./insights.mjs?v=5";
 
 const words={
 en:{
