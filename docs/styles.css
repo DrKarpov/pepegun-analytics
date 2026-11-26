@@ -135,8 +135,14 @@ details.detail:not([open]){padding-top:5px;padding-bottom:5px}
 .method-list li+li{margin-top:7px}
 .method-facts{font-size:12px;line-height:1.7;color:var(--muted);overflow-wrap:anywhere}
 .method-facts a{overflow-wrap:anywhere}
-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 18px;padding:16px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+footer{display:grid;justify-items:center;gap:14px;padding:18px 0 0;color:var(--muted);font-size:11px;line-height:1.5;text-align:center}
 footer p{max-width:720px}
+.footer-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:min(100%,460px);align-items:stretch}
+.footer-link{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:44px;padding:9px 10px;border:1px solid var(--accent);border-radius:8px;background:#1a2417;color:var(--accent);font-size:12px;font-weight:600;line-height:1.3;text-align:center}
+.footer-link svg{width:16px;height:16px;flex:0 0 16px}
+.footer-link span{min-width:0;overflow-wrap:break-word}
+.footer-link:hover{background:#26351e;text-decoration:none}
+@media(max-width:350px){.footer-links{gap:7px}.footer-link{font-size:11px;padding:8px 5px;gap:5px}.footer-link svg{width:14px;height:14px;flex-basis:14px}}
 @media(min-width:800px){.page{padding-left:28px;padding-right:28px}.chart-card{padding:19px}.chart{min-height:250px}.venue-list{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px}}
 @media(max-width:799px){
   .page{padding-left:18px;padding-right:18px}
