@@ -214,6 +214,16 @@ try{
  install(()=>[freshAmbiguous]);
  assert.equal((await crossCheck(withAmbiguous,undefined,{checkpoint:packedCheckpoint})).method,"incremental");
  assert.equal(withAmbiguous.ambiguous,2);
+ // A matching transaction hash alone cannot hide a changed classification
+ // of an anchor returned by the provider during the fast check.
+ const headTxs=[feeTx,t[1],{...t[2],m:freshFee.m}];
+ const checkedHead=cacheFrom(headTxs,"toncenter");
+ install(()=>headTxs.slice().reverse());
+ const headProof=await crossCheck(checkedHead);
+ const headCheckpoint={...checkedHead,audit:headProof};
+ install(u=>u.searchParams.get("limit")==="1"?[t[2]]:t.slice().reverse());
+ const wrongHead=await crossCheck(checkedHead,undefined,{checkpoint:headCheckpoint});
+ assert.equal(wrongHead.status,"mismatch");assert.equal(requests.length,2);
  const corrupt={...packedCheckpoint,rows:packedCheckpoint.rows.map(r=>({...r,v:"999"}))};
  install(()=>labelled.slice().reverse());
  assert.equal((await crossCheck(labelledCache,undefined,{checkpoint:corrupt})).method,"full");
