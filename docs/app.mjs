@@ -395,7 +395,9 @@ function render(){
  renderCharts();renderDetails();renderTransactions();updateStatus();updateCardExport();
  if(m||!busy)document.getElementById("startup-screen")?.dispatchEvent(new Event("pepegun:ready"));
 }
-const colors={all:"#b5ef58",paid:"#71c5b3",new:"#a8d956",returning:"#414f48",fee:"#a8d956",grid:"#292e2b",text:"#919c95"};
+const colors={all:"#b5ef58",paid:"#71c5b3",new:"#a8d956",returning:"#607367",fee:"#a8d956",grid:"#292e2b",text:"#919c95"};
+// Keep returning bars above 3:1 on the dark card even for incomplete intervals.
+const barOpacity=(key,partial,defaultPartial)=>!partial?1:key==="returning"?.92:defaultPartial;
 const fnum=(x,step=1)=>new Intl.NumberFormat(locale(),{maximumFractionDigits:Math.max(0,Math.min(9,Math.ceil(-Math.log10(step))+1)),notation:x>=100000?"compact":"standard"}).format(x);
 function chartSpec(){return [
  ["growth-chart",series.bins,[{key:"cum",label:tr("allShort"),color:colors.all},{key:"cumPay",label:tr("payingShort"),color:colors.paid}],"line",false],
@@ -423,7 +425,7 @@ function drawChart(id,data,series,kind,decimal){
  for(const i of idxs){const edge=hourly()?32:15;const px=Math.min(W-R-edge,Math.max(L+edge,x(i)));svg+='<text x="'+px+'" y="'+(H-7)+'" text-anchor="middle" font-size="10" fill="'+colors.text+'">'+esc(axisLabel(data[i]))+'</text>'}
  const isPartial=r=>r.status!=="complete";
  if(kind==="bar"||kind==="stack"){
-  data.forEach((r,i)=>{let prev=0;const bw=Math.max(.6,Math.min(cell*.7,24));for(const s of series.filter(z=>!z.line)){const v=val(r,s);if(v>0){const top=y(prev+v),h=y(prev)-top;svg+='<rect x="'+(x(i)-bw/2)+'" y="'+top+'" width="'+bw+'" height="'+h+'" rx="'+Math.min(2,bw/4)+'" fill="'+s.color+'" opacity="'+(isPartial(r)?.48:1)+'"/>'}prev+=v}});
+  data.forEach((r,i)=>{let prev=0;const bw=Math.max(.6,Math.min(cell*.7,24));for(const s of series.filter(z=>!z.line)){const v=val(r,s);if(v>0){const top=y(prev+v),h=y(prev)-top;svg+='<rect x="'+(x(i)-bw/2)+'" y="'+top+'" width="'+bw+'" height="'+h+'" rx="'+Math.min(2,bw/4)+'" fill="'+s.color+'" opacity="'+barOpacity(s.key,isPartial(r),.48)+'"/>'}prev+=v}});
  }
  if(kind==="line"||series.some(s=>s.line)){
   for(const s of series.filter(z=>kind==="line"||z.line)){
@@ -592,13 +594,13 @@ async function exportPng(){
  for(const d of data){max=Math.max(max,...series.map(([k])=>val(d,k)),mode==="stack"?d.active:0)}const unit=max?10**Math.floor(Math.log10(max/3)):1,raw=max/3/unit,nice=(raw<=1?1:raw<=2?2:raw<=2.5?2.5:raw<=5?5:10)*unit,step=max?(mode==="bar"?Math.max(1e-9,nice):Math.max(1,Math.ceil(nice))):1;max=Math.max(step,Math.ceil(max/step)*step);const ticks=Math.round(max/step);
  const at=i=>L+(i+.5)*pw/Math.max(1,data.length),py=v=>B-v/max*ph,bw=Math.max(.6,Math.min(15,pw/Math.max(1,data.length)*.7));
  for(let i=0;i<=ticks;i++){const v=i*step,yy=py(v);g.strokeStyle=palette.border;g.beginPath();g.moveTo(L,yy);g.lineTo(R,yy);g.stroke();txt(new Intl.NumberFormat(loc,{maximumSignificantDigits:3}).format(v),x+7,yy+4,11,palette.muted,false,45)}
- if(mode==="bar"||mode==="stack")data.forEach((d,i)=>{let prev=0;for(const [k,c] of series.filter(s=>mode==="bar"||s[0]!=="paying")){const v=val(d,k);g.fillStyle=c;g.globalAlpha=d.status==="complete"?1:.45;g.fillRect(at(i)-bw/2,py(prev+v),bw,py(prev)-py(prev+v));g.globalAlpha=1;prev+=v}});
+ if(mode==="bar"||mode==="stack")data.forEach((d,i)=>{let prev=0;for(const [k,c] of series.filter(s=>mode==="bar"||s[0]!=="paying")){const v=val(d,k);g.fillStyle=c;g.globalAlpha=barOpacity(k,d.status!=="complete",.45);g.fillRect(at(i)-bw/2,py(prev+v),bw,py(prev)-py(prev+v));g.globalAlpha=1;prev+=v}});
  for(const [k,c] of series.filter(s=>mode==="line"||(mode==="stack"&&s[0]==="paying"))){g.strokeStyle=c;g.lineWidth=2;g.beginPath();data.forEach((d,i)=>{const px=at(i),yy=py(val(d,k));i?g.lineTo(px,yy):g.moveTo(px,yy)});g.stroke();if(data.length===1){g.fillStyle=c;g.beginPath();g.arc(at(0),py(val(data[0],k)),2.5,0,Math.PI*2);g.fill()}}
  if(data.length){const stamp=b=>["15m","1h","3h","6h"].includes(exportSeries.kind)?b.date.slice(5,10)+" "+b.date.slice(11,16):b.date.slice(0,10);txt(stamp(data[0]),L,B+18,11,palette.muted);const last=stamp(data.at(-1));g.font=font(11);if(data.length>1)txt(last,R-g.measureText(last).width,B+18,11,palette.muted)}
  let xx=x+16;for(const [k,c,label] of series){g.fillStyle=c;g.fillRect(xx,y+h-23,7,7);txt(label,xx+11,y+h-16,11,palette.muted);g.font=font(11);xx+=g.measureText(label).width+27}
  }
  draw(38,223,1124,266,words[currentLang].growth,exportSeries.bins,[["cum",palette.green,words[currentLang].allShort],["cumPay",palette.paid,words[currentLang].payingShort]]);
- draw(38,505,554,315,words[currentLang].daily,exportSeries.bins,[["new",palette.green,words[currentLang].newShort],["returning","#414f48",words[currentLang].returningShort],["paying",palette.paid,words[currentLang].payingShort]],"stack");
+ draw(38,505,554,315,words[currentLang].daily,exportSeries.bins,[["new",palette.green,words[currentLang].newShort],["returning",colors.returning,words[currentLang].returningShort],["paying",palette.paid,words[currentLang].payingShort]],"stack");
  draw(608,505,554,315,words[currentLang].feesChart,exportSeries.bins,[["fee",palette.green,"GRAM"]],"bar");
  txt(words[currentLang].exportNote,38,852,14,palette.muted,false,1124);
  txt(words[currentLang].collector+": "+ADDRESS,38,878,12,palette.muted,false,1124);
