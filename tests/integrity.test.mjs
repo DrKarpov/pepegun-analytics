@@ -79,7 +79,7 @@ try{
 const match={...auditResult(c,"match"),asOf:Date.now()-4000};
 const mismatch={...auditResult(c,"mismatch"),asOf:Date.now()-3000};
 const unavailable={...auditResult(c,"unavailable"),asOf:Date.now()-2000};
-assert.equal(auditTrust({...c,audit:{status:"match",tip:c.tip,asOf:match.asOf}}),"unavailable");
+assert.equal(auditTrust({...c,audit:{status:"match",tip:c.tip,asOf:match.asOf}}),"unchecked");
 assert.equal(auditTrust({...c,audit:match}),"match");
 assert.equal(auditTrust({...c,audit:mismatch}),"mismatch");
 assert.equal(mergeAudit({...c,audit:mismatch},unavailable).status,"mismatch");
@@ -88,7 +88,7 @@ assert.equal(mergeAudit({...c,audit:mismatch},{...match,asOf:Date.now()-1000}).s
 const advanced=cacheFrom([{h:hash(4),lt:"4",prev:"3",prevHash:hash(3),t:104,success:true,m:null}],"toncenter",c);
 assert.equal(auditTrust({...advanced,audit:match}),"prior");
 assert.equal(auditTrust({...advanced,audit:mergeAudit(advanced,mismatch)}),"mismatch");
-assert.equal(auditTrust({...c,audit:{...match,tipHash:hash(9)}}),"unavailable");
+assert.equal(auditTrust({...c,audit:{...match,tipHash:hash(9)}}),"unchecked");
 assert.equal(historyConflict(c,advanced),false);
 assert.equal(historyConflict(c,cacheFrom(changed,"tonapi")),true);
 console.log("P1 identity regression checks passed");

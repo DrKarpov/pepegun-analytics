@@ -137,7 +137,8 @@ export function auditTrust(c){
  const a=c?.audit;
  if(!c||!validAudit(a,c.tip))return "unchecked";
  if(a.status==="mismatch")return "mismatch";
- if(a.status==="unavailable"||a.scope!==AUDIT_SCOPE||!c.history||!a.tipHash||c.history.find(row=>row[0]===a.tip)?.[1]!==a.tipHash)return "unavailable";
+ if(a.status==="unavailable")return "unavailable";
+ if(a.scope!==AUDIT_SCOPE||!c.history||!a.tipHash||c.history.find(row=>row[0]===a.tip)?.[1]!==a.tipHash)return "unchecked";
  return a.tip===c.tip?"match":"prior";
 }
 // A failed/unavailable retry cannot erase an established disagreement.
