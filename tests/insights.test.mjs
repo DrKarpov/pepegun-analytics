@@ -43,3 +43,10 @@ assert.equal(commentKind("Pepegun fee · https://example.com").k,"fee");
 assert.equal(commentKind("Pepegun fee · Autosell:TopBlast V2").d,"Autosell:TopBlast V2");
 assert.equal(validateSeed({version:VERSION,address:RAW,source:"toncenter",asOf:t+DAY,transactions:[packTransaction(tx)],audit:{...check,status:"mismatch"}}),null);
 assert.equal(selectSnapshot(snap,{...conflicting,audit:{...check,tip:"0"}}).audit.status,"mismatch");
+
+// A newer seed cannot silently replace a conflicting accepted history.
+const conflictingExtension=cacheFrom([{...tx,h:"3".repeat(64),lt:"3",prev:conflicting.tip,t:tx.t+2,m:null}],"tonapi",conflicting,t+DAY);
+assert.equal(selectSnapshot(snap,conflictingExtension).tipHash,snap.tipHash);
+assert.equal(selectSnapshot(snap,conflictingExtension).audit.status,"mismatch");
+assert.equal(selectSnapshot(advanced,conflicting).tipHash,advanced.tipHash);
+assert.equal(selectSnapshot(advanced,conflicting).audit.status,"mismatch");
