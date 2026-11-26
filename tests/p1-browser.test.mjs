@@ -111,6 +111,38 @@ async function watchCsp(context){
 async function assertNoCsp(page,label){
  assert.deepEqual(await page.evaluate(()=>window.__cspViolations),[],label+" unexpected CSP violation");
 }
+// Playwright's WebKit screenshot preparation temporarily appends <style>body {}</style>
+// to synchronize animations (server/screenshotter.js). CSP correctly rejects it.
+// Attribute ONLY this test-induced event to the screenshot, with DOM evidence.
+// Do not change the production policy, disable CSP, or suppress other violations.
+async function screenshotWithCsp(page,engine,options){
+ await assertNoCsp(page,engine+" before screenshot");
+ if(engine!=="webkit"){await page.screenshot(options);return}
+ await page.evaluate(()=>{
+  const styles=[];
+  const observer=new MutationObserver(records=>{
+   for(const record of records)for(const node of record.addedNodes)
+    if(node instanceof HTMLStyleElement)styles.push(node.textContent);
+  });
+  observer.observe(document.documentElement,{childList:true,subtree:true});
+  window.__screenshotStyleProbe={styles,observer};
+ });
+ await page.screenshot(options);
+ // CSP reports and mutation observer callbacks are asynchronous; finish their
+ // delivery before attributing events to the screenshot.
+ await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,100)));
+ const trace=await page.evaluate(()=>{
+  const {styles,observer}=window.__screenshotStyleProbe;observer.disconnect();delete window.__screenshotStyleProbe;
+  return {styles,violations:[...window.__cspViolations]};
+ });
+ if(trace.violations.length){
+  assert.ok(trace.styles.length>0&&trace.styles.every(css=>css==="body {}"),"WebKit screenshot injected unexpected stylesheet: "+JSON.stringify(trace));
+  assert.ok(trace.violations.length<=trace.styles.length&&trace.violations.every(v=>v.directive==="style-src-elem"&&v.blocked==="inline"&&v.disposition==="enforce"),"Unexpected screenshot CSP violation: "+JSON.stringify(trace));
+  console.log(engine,"CSP blocked screenshot-only empty style; DOM evidence",JSON.stringify(trace));
+  await page.evaluate(n=>window.__cspViolations.splice(0,n),trace.violations.length);
+ }
+ await assertNoCsp(page,engine+" after screenshot");
+}
 
 try{
  for(const [name,engine] of [["chromium",chromium],["webkit",webkit]]){
@@ -155,7 +187,7 @@ try{
      return {full:rect.left===0&&rect.top===0&&Math.abs(rect.width-innerWidth)<1&&Math.abs(rect.height-innerHeight)<1,center:Math.abs(content.left+content.width/2-innerWidth/2)<1&&Math.abs(content.top+content.height/2-innerHeight/2)<1,fits:content.left>=0&&content.right<=innerWidth&&content.top>=0&&content.bottom<=innerHeight};
     });
     assert.deepEqual(geometry,{full:true,center:true,fits:true});
-    if(width===393||width===1440)await page.screenshot({path:resolve(artifacts,name+"-startup-"+width+".png")});
+    if(width===393||width===1440)await screenshotWithCsp(page,name,{path:resolve(artifacts,name+"-startup-"+width+".png")});
    }
    releaseStartup();
    await startup.waitFor({state:"detached"});
@@ -197,7 +229,7 @@ try{
      if(await page.locator("html").getAttribute("lang")!==lang)await page.locator("#language").click();
      await waitStatus(page,lang==="ru"?"Источники расходятся":"Sources disagree");
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,name+" "+width+" "+lang+" horizontal overflow");
-     await page.screenshot({path:resolve(artifacts,name+"-"+width+"-"+lang+".png"),fullPage:false});
+     await screenshotWithCsp(page,name,{path:resolve(artifacts,name+"-"+width+"-"+lang+".png"),fullPage:false});
     }
    }
    await page.evaluate(()=>window.__canvasText=[]);
@@ -379,7 +411,7 @@ try{
    assert.deepEqual(await contrastPage.locator('#daily-chart rect[fill="#607367"]').evaluateAll(nodes=>nodes.map(n=>Number(n.getAttribute("opacity"))).sort()),[.92,1]);
    assert.equal(await contrastPage.locator("#daily-chart .chart-legend .swatch").nth(1).evaluate(e=>getComputedStyle(e).backgroundColor),"rgb(96, 115, 103)");
    await contrastPage.locator("#daily-chart").scrollIntoViewIfNeeded();
-   await contrastPage.screenshot({path:resolve(artifacts,name+"-returning-contrast.png")});
+   await screenshotWithCsp(contrastPage,name,{path:resolve(artifacts,name+"-returning-contrast.png")});
    // Inspect the actual PNG pixels rather than the rendering code.
    // The chart bars have both opaque and composited interior pixels.
    const pixelCounts=async (base64,preview=false)=>contrastPage.evaluate(async ({base64,preview,foreground,mixed})=>{
