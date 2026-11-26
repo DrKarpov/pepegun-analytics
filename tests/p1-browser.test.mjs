@@ -244,6 +244,66 @@ try{
    await legacyPage.keyboard.press("Escape");
    await legacyPage.locator("#card-export-menu").waitFor({state:"hidden"});
    await migration.close();
+   // P2-05: a wallet active on consecutive days produces returning bars
+   // in a complete interval and the incomplete current UTC bucket.
+   const contrastCtx=await browser.newContext({viewport:{width:393,height:852},locale:"en-US",acceptDownloads:true});
+   // Fix the browser clock within a 3-hour bucket. The midnight transaction
+   // in the original fixture was in a COMPLETE bucket by the evening run.
+   const day=Math.floor(now/86400000)*86400,contrastNow=(day+13*3600)*1000;
+   const contrastTxs=[day-172800+60,day-86400+60,day+12*3600+60].map((t,i)=>({...txs[i],t,m:{...txs[i].m,s:txs[0].m.s}}));
+   const contrastCache=cacheFrom(contrastTxs,"toncenter",null,contrastNow);
+   const contrastSeed={...snapshot,asOf:contrastNow,transactions:contrastTxs.map(packTransaction),audit:{...snapshot.audit,asOf:contrastNow,tip:contrastCache.tip,tipHash:contrastCache.tipHash}};
+   await contrastCtx.route("https://raw.githubusercontent.com/**/snapshot.json*",route=>route.fulfill({json:contrastSeed}));
+   await contrastCtx.route("https://toncenter.com/**",route=>{
+    const u=new URL(route.request().url());
+    return ok(route,u.searchParams.has("start_lt")?[]:u.searchParams.get("limit")==="1"?[tc(contrastTxs.at(-1))]:contrastTxs.slice().reverse().map(tc));
+   });
+   const contrastPage=await contrastCtx.newPage();
+   await contrastPage.clock.setFixedTime(new Date(contrastNow));
+   await contrastPage.goto(url);await contrastPage.locator("#startup-screen").waitFor({state:"detached"});
+   await contrastPage.waitForFunction(()=>!document.querySelector("#refresh").disabled&&document.querySelector("#status").className==="status ");
+   const background=[23,26,24],foreground=[96,115,103];
+   const lum=rgb=>rgb.map(n=>{n/=255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
+   const ratio=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
+   const mixed=foreground.map((n,i)=>Math.round(.92*n+.08*background[i]));
+   assert.ok(ratio(foreground,background)>=3);
+   assert.ok(ratio(mixed,background)>=3);
+   assert.ok(ratio(foreground,[168,217,86])>=3);
+   assert.deepEqual(await contrastPage.locator('#daily-chart rect[fill="#607367"]').evaluateAll(nodes=>nodes.map(n=>Number(n.getAttribute("opacity"))).sort()),[.92,1]);
+   assert.equal(await contrastPage.locator("#daily-chart .chart-legend .swatch").nth(1).evaluate(e=>getComputedStyle(e).backgroundColor),"rgb(96, 115, 103)");
+   await contrastPage.locator("#daily-chart").scrollIntoViewIfNeeded();
+   await contrastPage.screenshot({path:resolve(artifacts,name+"-returning-contrast.png")});
+   // Inspect the actual PNG pixels rather than the rendering code.
+   // The chart bars have both opaque and composited interior pixels.
+   const pixelCounts=async (base64,preview=false)=>contrastPage.evaluate(async ({base64,preview,foreground,mixed})=>{
+    let canvas;
+    if(preview)canvas=document.querySelector("#card-export-preview");
+    else{
+     const img=new Image();img.src="data:image/png;base64,"+base64;await img.decode();
+     canvas=document.createElement("canvas");canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+     canvas.getContext("2d").drawImage(img,0,0);
+    }
+    const pixels=canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data;
+    let full=0,partial=0;
+    const close=(i,c)=>Math.abs(pixels[i]-c[0])<=1&&Math.abs(pixels[i+1]-c[1])<=1&&Math.abs(pixels[i+2]-c[2])<=1&&pixels[i+3]===255;
+    for(let i=0;i<pixels.length;i+=4){if(close(i,foreground))full++;if(close(i,mixed))partial++}
+    return {full,partial,width:canvas.width,height:canvas.height};
+   },{base64,preview,foreground,mixed});
+   for(const lang of ["en","ru"]){
+    if(await contrastPage.locator("html").getAttribute("lang")!==lang)await contrastPage.locator("#language").click();
+    const globalPng=await readDownload(contrastPage,"#png");
+    const globalColors=await pixelCounts(globalPng.toString("base64"));
+    assert.ok(globalColors.full>50&&globalColors.partial>50,name+" "+lang+" global PNG returning contrast "+JSON.stringify(globalColors));
+    const activity=contrastPage.locator('[data-card-export="activity"]');
+    await activity.focus();await contrastPage.keyboard.press("Enter");
+    await contrastPage.waitForFunction(()=>!document.querySelector("#card-export-download").disabled);
+    const previewColors=await pixelCounts("",true);
+    assert.ok(previewColors.full>50&&previewColors.partial>50,name+" "+lang+" individual PNG preview contrast "+JSON.stringify(previewColors));
+    const activityPng=await readDownload(contrastPage,"#card-export-download");
+    assert.deepEqual(await pixelCounts(activityPng.toString("base64")),previewColors,name+" "+lang+" downloaded PNG matches preview color counts");
+    await contrastPage.locator("#card-export-menu").waitFor({state:"hidden"});
+   }
+   await contrastCtx.close();
    // Failure and reduced-motion: normal application error must remain usable.
    const offline=await browser.newContext({viewport:{width:393,height:852},reducedMotion:"reduce"});
    await offline.route("**/snapshot.json*",deny);
@@ -273,7 +333,7 @@ try{
    await nojs.close();
    assert.deepEqual(errors,[]);
    await ctx.close();
-   console.log(name,"Trust states, bilingual viewports, CSV/PNG, audit cancellation, startup screen and chart gestures verified");
+   console.log(name,"Trust states, bilingual viewports, CSV/PNG, audit cancellation, startup screen, chart gestures and returning contrast verified");
   }finally{await browser.close()}
  }
 }finally{server.close()}
