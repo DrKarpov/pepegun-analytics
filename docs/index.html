@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d100e"><meta name="description" content="Independent on-chain statistics for the Pepegun fee collector: wallet activity, fees and growth.">
+<meta property="og:title" content="Pepegun Analytics"><meta property="og:description" content="Independent TON on-chain analytics."><meta property="og:type" content="website">
+<title>Pepegun Analytics</title><link rel="icon" type="image/svg+xml" href="./pepegun-logo.svg"><link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<main class="page">
+<header class="header">
+<div class="brand"><img src="./pepegun-logo.svg" width="48" height="48" alt="Pepegun"><div><h1>Pepegun Analytics</h1><p data-i="subtitle">Independent on-chain analytics</p></div></div>
+<div class="header-tools"><div class="language" role="group" aria-label="Language"><button type="button" id="en" aria-pressed="true">EN</button><button type="button" id="ru" aria-pressed="false">RU</button></div><button type="button" id="refresh" class="refresh" aria-label="Refresh data" title="Refresh data"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5.8 8a7 7 0 0 1 11.8-2L20 9M4 15l2.4 3A7 7 0 0 0 18.2 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+</header>
+<div class="statusline" aria-live="polite"><span id="status" class="status"><i></i><span id="status-text">Loading history</span></span><span id="updated" class="muted"></span></div>
+<div id="notice" class="notice" hidden></div>
+<section class="controls" aria-label="Time range"><div id="filters" class="filters" role="group"><button data-range="all" data-i="all" aria-pressed="true">All time</button><button data-range="30d" data-i="d30" aria-pressed="false">30d</button><button data-range="7d" data-i="d7" aria-pressed="false">7d</button><button data-range="24h" data-i="h24" aria-pressed="false">24h</button><button data-range="custom" data-i="custom" aria-pressed="false">Custom</button></div><div class="exports"><button id="csv" class="outline" disabled>CSV <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 11v3h10v-3" stroke="currentColor" fill="none" stroke-linecap="round"/></svg></button><button id="png" class="outline" disabled>PNG <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 11v3h10v-3" stroke="currentColor" fill="none" stroke-linecap="round"/></svg></button></div></section>
+<div id="custom" class="date-fields" hidden><label><span data-i="from">From (UTC)</span><input id="from" type="date"></label><label><span data-i="to">To (UTC)</span><input id="to" type="date"></label></div>
+<p id="range-note" class="range-note"></p>
+<section id="overview" class="kpis" aria-label="Overview"></section>
+<section id="active" class="activity panel" aria-label="Active wallets"></section>
+<div id="finite" class="secondary" hidden></div>
+<section class="charts" aria-label="Charts">
+<article class="panel chart-card"><h2 data-i="growth">Audience growth</h2><p data-i="growthHint" class="sub">Cumulative distinct addresses since inception</p><div id="growth-chart" class="chart"></div></article>
+<article class="panel chart-card"><h2 data-i="daily">Daily active wallets</h2><p data-i="dailyHint" class="sub">Distinct wallets per UTC day</p><div id="daily-chart" class="chart"></div></article>
+<article class="panel chart-card"><h2 data-i="feesChart">Daily fee revenue</h2><p data-i="feesHint" class="sub">Gross incoming labelled fees · GRAM</p><div id="fees-chart" class="chart"></div></article>
+<article class="panel chart-card"><h2 data-i="weekly">Weekly active wallets</h2><p data-i="weeklyHint" class="sub">UTC weeks, starting Monday</p><div id="weekly-chart" class="chart"></div></article>
+</section>
+<section class="panel detail"><h2 data-i="venues">Activity by venue label</h2><p class="sub" data-i="venueHint">Labels in on-chain transfer comments, not verified trade execution.</p><div id="venues"></div></section>
+<details class="panel detail"><summary data-i="advanced">Detailed statistics</summary><div id="advanced" class="details-content"></div><h3 data-i="retention">Weekly retention</h3><p class="sub" data-i="retentionHint">Share of each first-seen cohort active again in later weeks. Current week may be incomplete.</p><div id="retention"></div><h3 data-i="history">Daily history</h3><p class="sub" data-i="historyHint">All-time cumulative totals; other columns use selected dates. Swipe the table on small screens.</p><div id="history"></div><button class="outline more" id="more" hidden></button></details>
+<details class="panel detail"><summary data-i="method">Methodology &amp; source</summary><div class="details-content" id="method"></div><button id="resync" class="outline" data-i="resync">Reload full history</button></details>
+<footer><p data-i="disclaimer">Independent community dashboard, not operated or endorsed by Pepegun. Wallet addresses are not individual users.</p><a id="source" target="_blank" rel="noopener noreferrer" href="https://tonviewer.com/UQD-J5lB6VMC1Cyyz2bLEEflmiG0JRXv7fccO6olayRRqWrc" data-i="source">View on Tonviewer</a></footer>
+<noscript>JavaScript is required to fetch and aggregate public blockchain transactions.</noscript>
+</main><script type="module" src="./app.mjs"></script>
+</body></html>
