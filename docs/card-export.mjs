@@ -42,7 +42,7 @@ export async function renderCardPng(s){
  function round(x,y,w,h,fill){g.beginPath();if(g.roundRect)g.roundRect(x,y,w,h,14);else g.rect(x,y,w,h);g.fillStyle=fill;g.fill();g.strokeStyle=palette.border;g.lineWidth=1;g.stroke()}
  function fit(value,x,y,n,width,color,b=true){font(n,b);while(n>12&&g.measureText(value).width>width)font(--n,b);g.textAlign="center";g.textBaseline="top";g.fillStyle=color;g.fillText(value,x,y)}
  const dates=cardTimeLabels(s.meta.period,s.subtitle,s.readout);
- const title=lines(s.title,cw-24,23,true),sub=lines(dates.subtitle,cw-24,15),desc=lines(s.description,cw-24,15),period=lines(dates.period+(s.meta.stale?" · "+L.stale:""),cw,15,true),read=lines(dates.readout,cw-28,15);
+ const title=lines(s.title,cw-24,23,true),sub=lines(dates.subtitle,cw-24,15),desc=lines(s.description,cw-24,15),period=lines(dates.period+(s.meta.stale?" · "+L.stale:"")+(s.meta.trust?" · "+s.meta.trust:""),cw,15,true),read=lines(dates.readout,cw-28,15);
  const top=p+36+6+period.length*20+10;
  let tiles=[],rows=[],cols=0,tileW=0,cardH=0,plotH=0,legendRows=[];
  const contentTop=12+title.length*30+sub.length*20+desc.length*20;
@@ -60,7 +60,7 @@ export async function renderCardPng(s){
  const logo=await imageFrom(new URL("./pepegun-logo.svg",import.meta.url).href);
  const logoScale=Math.min(34/logo.naturalWidth,34/logo.naturalHeight);const lw=logo.naturalWidth*logoScale,lh=logo.naturalHeight*logoScale;font(24,true);const brandW=34+9+g.measureText("Pepegun Analytics").width,bx=(W-brandW)/2;g.drawImage(logo,bx+(34-lw)/2,p+(34-lh)/2,lw,lh);
  drawLines(["Pepegun Analytics"],bx+43,p+3,24,palette.text,true,"left");
- let y=p+42;y=drawLines(period,W/2,y,15,palette.accent,true,"center",20);
+ let y=p+42;y=drawLines(period,W/2,y,15,s.meta.suspect?"#ffb16b":palette.accent,true,"center",20);
  round(p,top,cw,cardH,palette.card);y=top+12;y=drawLines(title,W/2,y,23,palette.text,true,"center",30);y=drawLines(sub,W/2,y,15,palette.muted,false,"center",20);y=drawLines(desc,W/2,y,15,palette.muted,false,"center",20);
  if(s.tiles){
   for(const r of rows){r.group.forEach((t,i)=>{const x=p+i*tileW,mid=x+tileW/2;
