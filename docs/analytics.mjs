@@ -85,8 +85,12 @@ export async function download(source,after,progress){
  }
  return ordered([...m.values()]);
 }
+export function validAudit(a,tip){
+ return !!a&&["match","mismatch","unavailable"].includes(a.status)&&typeof a.tip==="string"&&/^\d+$/.test(a.tip)&&compareLt(a.tip,tip)<=0&&Number.isFinite(a.asOf)&&a.asOf>0&&a.asOf<=Date.now()+60000;
+}
 export function validCache(c){
  if(!c||c.version!==VERSION||c.address!==RAW||!["toncenter","tonapi"].includes(c.source)||!Array.isArray(c.rows)||typeof c.tip!=="string"||!/^\d+$/.test(c.tip)||!Number.isFinite(c.asOf)||c.asOf<=0||c.asOf>Date.now()+60000||!Number.isInteger(c.scanned)||c.scanned<=0||!Number.isInteger(c.ambiguous)||c.ambiguous<0||c.rows.length+c.ambiguous>c.scanned||typeof c.tipHash!=="string"||!/^[0-9a-f]{64}$/.test(c.tipHash)||!Number.isSafeInteger(c.tipTime)||!Number.isSafeInteger(c.firstTime)||c.firstTime<=0||c.tipTime<c.firstTime||c.tipTime*1000>c.asOf)return false;
+ if(c.audit!=null&&!validAudit(c.audit,c.tip))return false;
  const seen=new Set(),lt=new Set();
  return c.rows.every(r=>{if(!r||typeof r.h!=="string"||!/^[0-9a-f]{64}$/.test(r.h)||seen.has(r.h)||typeof r.lt!=="string"||!/^\d+$/.test(r.lt)||lt.has(r.lt)||compareLt(r.lt,c.tip)>0||!Number.isSafeInteger(r.t)||r.t<c.firstTime||r.t>c.tipTime||!raw(r.s)||r.s!==raw(r.s)||r.s===RAW||typeof r.v!=="string"||!/^\d+$/.test(r.v)||BigInt(r.v)<=0n||!["fee","other"].includes(r.k)||typeof r.d!=="string"||r.d.length>64)return false;seen.add(r.h);lt.add(r.lt);return true});
 }

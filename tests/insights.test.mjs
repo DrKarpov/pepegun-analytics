@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import {commentKind,compareSnapshots,DAY,RAW,VERSION,cacheFrom,minimizeTransaction,packTransaction,validCache,amount,compactAmount,resolveRange} from "../docs/analytics.mjs";
-import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,validateSeed} from "../docs/insights.mjs";
+import {commentKind,compareSnapshots,DAY,RAW,VERSION,cacheFrom,minimizeTransaction,packTransaction,validCache,validAudit,amount,compactAmount,resolveRange} from "../docs/analytics.mjs";
+import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,validateSeed,selectSnapshot} from "../docs/insights.mjs";
 const t=Date.UTC(2026,9,15),row=(s,v,d)=>({s,lt:String(v),v:String(v),t:(t+d*DAY)/1000,k:"fee"});
 const rows=[row("a",1,0),row("a",3,1),row("b",5,1),row("c",7,1),row("d",9,1),row("e",11,1),row("f",13,1)];
 const range={from:t+DAY,to:t+2*DAY,preset:"custom"},x=extraMetrics(rows,range,t+3*DAY);
@@ -27,3 +27,11 @@ for(const preset of ["6h","24h"]){const r=resolveRange(preset,edgeNow,t);const p
 assert.equal(compactAmount(168302141n,"en-US"),"0.1683");assert.equal(compactAmount(168302141n,"ru-RU"),"0,1683");assert.equal(compactAmount(700000000n),"0.7");assert.equal(compactAmount(1n),"<0.0001");assert.equal(compactAmount(0n),"0");assert.equal(amount(9007199254740993123456789n,9,"en-US"),"9,007,199,254,740,993.123456789");
 assert.equal(validCache(snap),true);assert.equal(validCache({...snap,rows:[snap.rows[0],snap.rows[0]]}),false);assert.equal(validCache({...snap,rows:[{...snap.rows[0],v:"bad"}]}),false);assert.equal(validCache({...snap,tipHash:"bad"}),false);
 assert.equal(adaptiveSeries(rows,{from:t,to:t+DAY},t+DAY-1).bins.at(-1).status,"complete");
+
+const check={status:"match",asOf:t+DAY,tip:snap.tip};
+assert.ok(validAudit(check,snap.tip));assert.equal(validAudit({...check,asOf:NaN},snap.tip),false);
+assert.equal(validCache({...snap,audit:{...check,tip:"999"}}),false);
+assert.equal(selectSnapshot(snap,{...snap,asOf:snap.asOf+1000}).asOf,snap.asOf+1000);
+assert.equal(selectSnapshot({...snap,tip:"2"},snap).tip,"2");
+assert.equal(selectSnapshot(snap,{...snap,tipHash:"f".repeat(64)}).tipHash,snap.tipHash);
+assert.equal(selectSnapshot(snap,{...snap,tipHash:"f".repeat(64),audit:check}).tipHash,"f".repeat(64));

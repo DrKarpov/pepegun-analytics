@@ -1,34 +1,307 @@
-import {ADDRESS,DAY,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,amount,exact,compactAmount,sync,loadCache,saveCache,crossCheck} from "./analytics.mjs?v=8";
-import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed} from "./insights.mjs?v=8";
+import {ADDRESS,DAY,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,amount,exact,compactAmount,sync,loadCache,saveCache,crossCheck,validAudit} from "./analytics.mjs?v=9";
+import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=9";
 const words={
-en:{
-subtitle:"Independent on-chain analytics",all:"All time",allFilter:"All",d30:"30d",d7:"7d",h24:"24h",custom:"Custom",from:"From (UTC)",to:"To (UTC)",
-growth:"Audience growth",growthHint:"Cumulative distinct addresses since inception",daily:"Daily active wallets",dailyHint:"Distinct wallets per UTC day",feesChart:"Daily fee revenue",feesHint:"Gross incoming labelled fees · GRAM",weekly:"Weekly active wallets",weeklyHint:"UTC weeks, starting Monday",
-venues:"Activity by venue label",venueHint:"Labels in on-chain transfer comments, not verified trade execution.",advanced:"Detailed statistics",retention:"Weekly retention",retentionHint:"Share of each first-seen cohort active again in later weeks. Current week may be incomplete.",history:"Daily history",historyHint:"All-time cumulative totals; other columns use selected dates. Swipe the table on small screens.",method:"Methodology & source",resync:"Reload full history",disclaimer:"Independent community dashboard, not operated or endorsed by Pepegun. Wallet addresses are not individual users.",source:"View on Tonviewer",
-loading:"Loading history",refreshing:"Checking for new data",synced:"Synced",stale:"Cached data",unavailable:"Data unavailable",lastSync:"Last sync",partialDay:"Current UTC day is incomplete.",shortPartial:"Current day incomplete",partial:"Partial period",incomplete:"Incomplete",complete:"Complete",refresh:"Refresh data",language:"Language",range:"Time range",overview:"Overview",
-wallets:"Unique wallets",paying:"Paying wallets",revenue:"Fee revenue",payments:"Fee payments",addresses:"Distinct sender addresses",share:"of unique wallets",gross:"Gross incoming fees",avg:"Average fee",active:"Active wallets",windowEnd:"As of",today:"1 day",week:"7 days",month:"30 days",new:"New wallets",returning:"Returning wallets",firstSeen:"First seen in selected period",seenBefore:"Seen before selected period",newShort:"New",returningShort:"Returning",payingShort:"Paying",allShort:"All wallets",fee:"Fees",day:"Date (UTC)",activeShort:"Active",count:"Payments",other:"Other transfers",cum:"Cumulative wallets",cumPay:"Cumulative paying",exactFee:"Exact fee total",largest:"Largest fee",otherValue:"Value of other transfers",prevDay:"Active previous UTC day",noData:"No qualifying data in this period",noHistory:"Waiting for verified blockchain history",noCache:"Could not load verified history. Use refresh to retry.",cachedError:"Refresh failed. Showing the last successful snapshot.",oldCache:"This snapshot is older than 20 minutes. Refresh to update.",retry:"API busy — retrying",downloading:"Fetching transactions",transactions:"transactions",badRange:"Choose valid dates within the available history.",persist:"Browser storage is unavailable. Data is still available for this visit.",noExport:"Could not create the file in this browser.",more:"Show all days",less:"Show latest 14 days",cohort:"First seen",size:"Wallets",asOf:"Data as of",notLive:"As of last successful sync",rolling:"Rolling 24 hours",calendar7:"7 UTC calendar days",calendar30:"30 UTC calendar days",dateRange:"Selected UTC dates",noFee:"No fee payments",weekOf:"Week of",scanned:"Transactions checked",provider:"Data provider",coverage:"History coverage",verified:"Continuous account history",collector:"Fee collector",exportTitle:"Pepegun Analytics",exportNote:"Wallets are addresses, not people. Independent on-chain dashboard.",
-methodItems:[
-"Data comes from the single public fee collector on TON via Toncenter API v3 or TonAPI v2. Every full download must form an unbroken transaction chain back to the account's first transaction.",
-"Counts include successful incoming positive native-currency transfers with a recognized Pepegun comment prefix; bounced transfers and transfers from the collector itself are excluded. Hashes and complete normalized sender addresses are deduplicated. The comment alone does not prove a trade occurred.",
-"Only comments with the recognized Pepegun fee prefix count as fee payments and gross fee revenue. Other Pepegun transfers, including non-micro amounts, count toward wallet activity but not revenue. Fee payments are not a verified trade count, and gross fees are not profit.",
-"New wallets first appear in the selected interval. Returning wallets were first seen before it and are active in it. Cumulative totals count distinct addresses since inception. DAU/WAU/MAU are distinct wallets in the 1, 7 and 30 UTC days ending at the selected range end; these windows may extend before the selected range.",
-"All calendar dates are UTC. The 7- and 30-day presets include the current snapshot day and the preceding 6 or 29 days; 6h and 24h are rolling intervals. Charts use adaptive UTC intervals; incomplete intervals are marked. Cached data is calculated only through its last successful sync.",
-"Refresh runs on page open, manually, every 15 minutes while the page is open, and when returning to an old tab. The browser retains the last verified history; a public daily snapshot accelerates first load; no paid API is used. Availability depends on public blockchain indexers."]}
-,ru:{
-subtitle:"Независимая ончейн-аналитика",all:"Всё время",allFilter:"Всё",d30:"30 дн.",d7:"7 дн.",h24:"24 ч.",custom:"Период",from:"От (UTC)",to:"До (UTC)",
-growth:"Рост аудитории",growthHint:"Уникальные адреса с начала наблюдения",daily:"Активность по дням",dailyHint:"Уникальные кошельки за день UTC",feesChart:"Комиссии по дням",feesHint:"Входящие комиссии по комментариям · GRAM",weekly:"Активность по неделям",weeklyHint:"Недели UTC, с понедельника",
-venues:"Активность по площадкам",venueHint:"Метки из комментариев транзакций, а не подтверждённое исполнение сделок.",advanced:"Подробная статистика",retention:"Удержание по неделям",retentionHint:"Доля кошельков каждой когорты, активных в последующие недели. Текущая неделя может быть неполной.",history:"История по дням",historyHint:"Накопительные итоги — за всё время, остальные колонки — за выбранный период. На телефоне таблицу можно прокручивать.",method:"Методика и источник",resync:"Загрузить всю историю",disclaimer:"Независимый дашборд сообщества, не официальный продукт Pepegun. Адреса кошельков не равны отдельным пользователям.",source:"Открыть в Tonviewer",
-loading:"Загрузка истории",refreshing:"Проверка новых данных",synced:"Обновлено",stale:"Сохранённые данные",unavailable:"Данные недоступны",lastSync:"Синхронизация",partialDay:"Текущий день UTC ещё не завершён.",shortPartial:"День не завершён",partial:"Неполный период",incomplete:"Не завершён",complete:"Полный",refresh:"Обновить данные",language:"Язык",range:"Период",overview:"Основные показатели",
-wallets:"Уникальные кошельки",paying:"Платящие кошельки",revenue:"Доход с комиссий",payments:"Платежи комиссий",addresses:"Уникальные адреса",share:"от всех кошельков",gross:"Входящие комиссии",avg:"Средняя комиссия",active:"Активные кошельки",windowEnd:"На",today:"1 день",week:"7 дней",month:"30 дней",new:"Новые кошельки",returning:"Вернувшиеся",firstSeen:"Впервые в выбранном периоде",seenBefore:"Активны и замечены ранее",newShort:"Новые",returningShort:"Повторные",payingShort:"Платящие",allShort:"Все кошельки",fee:"Комиссии",day:"Дата (UTC)",activeShort:"Активные",count:"Платежи",other:"Другие переводы",cum:"Всего кошельков",cumPay:"Всего платящих",exactFee:"Точная сумма комиссий",largest:"Крупнейшая комиссия",otherValue:"Сумма других переводов",prevDay:"Активные за предыдущий день",noData:"Нет подходящих данных за период",noHistory:"Ожидание проверенной истории блокчейна",noCache:"Не удалось загрузить проверенную историю. Нажмите обновление.",cachedError:"Обновление не удалось. Показан последний успешный снимок.",oldCache:"Данные старше 20 минут. Обновите страницу.",retry:"Лимит API — повтор запроса",downloading:"Загрузка транзакций",transactions:"транзакций",badRange:"Выберите корректные даты в пределах истории.",persist:"Хранилище браузера недоступно. Данные доступны в текущем сеансе.",noExport:"Не удалось создать файл в этом браузере.",more:"Показать все дни",less:"Последние 14 дней",cohort:"Первое появление",size:"Кошельки",asOf:"Данные на",notLive:"На момент успешной синхронизации",rolling:"Последние 24 часа",calendar7:"7 календарных дней UTC",calendar30:"30 календарных дней UTC",dateRange:"Выбранные даты UTC",noFee:"Нет платежей комиссий",weekOf:"Неделя с",scanned:"Проверено транзакций",provider:"Источник данных",coverage:"Полнота истории",verified:"Непрерывная история адреса",collector:"Комиссионный кошелёк",exportTitle:"Pepegun Analytics",exportNote:"Кошельки — адреса, а не люди. Независимая ончейн-аналитика.",
-methodItems:[
-"Данные одного публичного комиссионного кошелька в TON получаются через Toncenter API v3 или TonAPI v2. Полная выгрузка должна образовывать непрерывную цепочку до первой транзакции адреса.",
-"Учитываются успешные входящие положительные переводы нативной валюты с распознанным префиксом комментария Pepegun. Возвращённые переводы и переводы самому себе исключаются. Повторы хешей и полных нормализованных адресов не учитываются. Комментарий сам по себе не подтверждает сделку.",
-"Только комментарии с префиксом Pepegun fee относятся к платежам комиссий и валовому комиссионному доходу. Другие переводы Pepegun, в том числе крупные, учитываются в активности, но не в доходе. Платежи не равны числу сделок, а валовые комиссии — чистой прибыли.",
-"Новые кошельки впервые появились в выбранном периоде. Вернувшиеся были замечены ранее и активны в нём. Накопительные итоги — уникальные адреса с начала наблюдения. Активность за 1, 7 и 30 дней рассчитана по календарным дням UTC до конца выбранного периода; эти окна могут начинаться раньше периода.",
-"Все календарные даты — UTC. Фильтры 7 и 30 дней включают день последнего снимка и 6 или 29 предыдущих дней; 6 и 24 часа — скользящие интервалы. Графики используют адаптивные интервалы UTC; неполные интервалы отмечены. Сохранённые данные считаются только до последней успешной синхронизации.",
-"Обновление при открытии, вручную, каждые 15 минут на открытой странице и при возврате в давно открытую вкладку. Браузер хранит последнюю проверенную историю; ежедневный публичный снимок ускоряет загрузку; платный API не используется. Доступность зависит от публичных индексаторов блокчейна."]}
+  "en": {
+    "subtitle": "Independent on-chain analytics",
+    "all": "All time",
+    "allFilter": "All",
+    "d30": "30d",
+    "d7": "7d",
+    "h24": "24h",
+    "custom": "Custom",
+    "from": "From (UTC)",
+    "to": "To (UTC)",
+    "growth": "Audience growth",
+    "growthHint": "Cumulative distinct addresses since inception",
+    "daily": "Wallet activity",
+    "dailyHint": "Distinct addresses per interval",
+    "feesChart": "Fee revenue",
+    "feesHint": "Gross incoming fees · GRAM",
+    "venues": "Activity by venue label",
+    "venueHint": "Labels in on-chain transfer comments, not verified trade execution.",
+    "advanced": "Detailed statistics",
+    "retention": "Wallet return rates",
+    "retentionHint": "New wallets in the selected period active again on a later UTC day within 7, 14 or 30 days. Only fully observed follow-up windows count.",
+    "history": "Interval history",
+    "historyHint": "Same intervals as charts.",
+    "method": "Methodology & source",
+    "resync": "Reload full history",
+    "disclaimer": "Independent community dashboard, not operated or endorsed by Pepegun. Wallet addresses are not individual users.",
+    "source": "View on Tonviewer",
+    "loading": "Loading history",
+    "refreshing": "Checking for new data",
+    "synced": "Synced",
+    "stale": "Cached data",
+    "unavailable": "Data unavailable",
+    "partial": "Partial period",
+    "incomplete": "Incomplete",
+    "complete": "Complete",
+    "refresh": "Refresh data",
+    "language": "Language",
+    "range": "Time range",
+    "overview": "Overview",
+    "wallets": "Unique wallets",
+    "paying": "Paying wallets",
+    "revenue": "Fee revenue",
+    "payments": "Fee payments",
+    "share": "of unique wallets",
+    "avg": "Average fee",
+    "active": "Active wallets",
+    "today": "1 day",
+    "week": "7 days",
+    "month": "30 days",
+    "new": "New wallets",
+    "returning": "Returning wallets",
+    "firstSeen": "First seen in selected period",
+    "seenBefore": "Seen before selected period",
+    "newShort": "New",
+    "returningShort": "Returning",
+    "payingShort": "Paying",
+    "allShort": "All wallets",
+    "fee": "Fees",
+    "day": "Date (UTC)",
+    "activeShort": "Active",
+    "count": "Payments",
+    "other": "Other transfers",
+    "cum": "Cumulative wallets",
+    "cumPay": "Cumulative paying",
+    "largest": "Largest fee",
+    "noData": "No qualifying data in this period",
+    "noHistory": "Waiting for verified blockchain history",
+    "noCache": "Could not load verified history. Use refresh to retry.",
+    "cachedError": "Refresh failed. Showing the last successful snapshot.",
+    "oldCache": "This snapshot is older than 20 minutes. Refresh to update.",
+    "retry": "API busy — retrying",
+    "downloading": "Fetching transactions",
+    "transactions": "transactions",
+    "badRange": "Choose valid dates within the available history.",
+    "persist": "Browser storage is unavailable. Data is still available for this visit.",
+    "noExport": "Could not create the file in this browser.",
+    "more": "Show more",
+    "less": "Show fewer",
+    "asOf": "Data as of",
+    "rolling": "Rolling 24 hours",
+    "calendar7": "7 UTC calendar days",
+    "calendar30": "30 UTC calendar days",
+    "dateRange": "Selected UTC dates",
+    "scanned": "Transactions checked",
+    "provider": "Data provider",
+    "coverage": "History coverage",
+    "verified": "Continuous account history",
+    "collector": "Fee collector",
+    "exportNote": "Wallets are addresses, not people. Independent on-chain dashboard.",
+    "methodItems": [
+      "Data comes from the single public fee collector on TON via Toncenter API v3 or TonAPI v2. Every full download must form an unbroken transaction chain back to the account's first transaction.",
+      "Counts include successful incoming positive native-currency transfers with a recognized Pepegun comment prefix; bounced transfers and transfers from the collector itself are excluded. Hashes and complete normalized sender addresses are deduplicated. The comment alone does not prove a trade occurred.",
+      "Only comments with the recognized Pepegun fee prefix count as fee payments and gross fee revenue. Other Pepegun transfers, including non-micro amounts, count toward wallet activity but not revenue. Fee payments are not a verified trade count, and gross fees are not profit.",
+      "New wallets first appear in the selected interval. Returning wallets were first seen before it and are active in it. Cumulative totals count distinct addresses since inception. DAU/WAU/MAU are distinct wallets in the 1, 7 and 30 UTC days ending at the selected range end; these windows may extend before the selected range.",
+      "All calendar dates are UTC. The 7- and 30-day presets include the current snapshot day and the preceding 6 or 29 days; 6h and 24h are rolling intervals. Charts use adaptive UTC intervals; incomplete intervals are marked. Cached data is calculated only through its last successful sync.",
+      "Refresh runs on page open, manually, every 15 minutes while the page is open, and when returning to an old tab. The browser retains the last verified history; a public daily snapshot accelerates first load; no paid API is used. Availability depends on public blockchain indexers."
+    ],
+    "median": "Median fee",
+    "perPayer": "Fees per paying wallet",
+    "top5": "Top 5 share of fees",
+    "top10": "Top 10 share of fees",
+    "newPayers": "New paying wallets",
+    "repeatPayers": "Returning paying wallets",
+    "comparison": "Previous comparable period",
+    "compareHint": "Equivalent elapsed UTC time in the previous window.",
+    "metric": "Metric",
+    "current": "Current",
+    "previous": "Previous",
+    "delta": "Change",
+    "noComparison": "Not enough history for an equivalent previous period.",
+    "audit": "Source cross-check",
+    "auditButton": "Compare both indexers",
+    "auditIdle": "Not independently checked for this snapshot",
+    "auditBusy": "Checking alternate indexer…",
+    "auditMatch": "Both sources match for the checked snapshot",
+    "auditMismatch": "Sources disagree — review required",
+    "auditUnavailable": "Alternate indexer could not verify this snapshot",
+    "ambiguous": "Unclassified Pepegun comments (all time)",
+    "chainTip": "Account transaction time",
+    "shortRules": "Only the exact Pepegun or Pepegun fee prefix (optionally 🔫), followed by a middle-dot label or end of text, is accepted. Other mentions are excluded and counted separately. Source agreement validates the indexers, not trade identity.",
+    "topHint": "Share of labelled fee revenue from the highest-paying addresses in the selected period.",
+    "h6": "6h",
+    "rolling6": "Rolling 6 hours",
+    "transactionsTitle": "Transactions",
+    "transactionsHint": "Incoming Pepegun transfers in the selected period, with links to Tonviewer.",
+    "filterAll": "All",
+    "filterFee": "Fees",
+    "filterOther": "Other",
+    "viewTx": "View transactions",
+    "viewInterval": "Selected interval",
+    "resetInterval": "Whole period",
+    "txEmpty": "No matching transfers",
+    "txTypeFee": "Fee",
+    "txTypeOther": "Other transfer",
+    "interval": "Interval",
+    "interval15": "15 min",
+    "interval1": "1 hour",
+    "interval3": "3 hours",
+    "interval6": "6 hours",
+    "intervalDay": "1 day",
+    "intervalWeek": "1 week",
+    "intervalMonth": "1 month",
+    "returnedWithin": "Within",
+    "auditPrior": "Earlier snapshot",
+    "calendarWindows": "UTC calendar windows",
+    "txShown": "Shown",
+    "of": "of",
+    "newPayShort": "New payers",
+    "txLink": "Tonviewer"
+  },
+  "ru": {
+    "subtitle": "Независимая ончейн-аналитика",
+    "all": "Всё время",
+    "allFilter": "Всё",
+    "d30": "30 дн.",
+    "d7": "7 дн.",
+    "h24": "24 ч.",
+    "custom": "Период",
+    "from": "От (UTC)",
+    "to": "До (UTC)",
+    "growth": "Рост аудитории",
+    "growthHint": "Уникальные адреса с начала наблюдения",
+    "daily": "Активность кошельков",
+    "dailyHint": "Уникальные адреса за интервал",
+    "feesChart": "Комиссии",
+    "feesHint": "Входящие комиссии · GRAM",
+    "venues": "Активность по площадкам",
+    "venueHint": "Метки из комментариев транзакций, а не подтверждённое исполнение сделок.",
+    "advanced": "Подробная статистика",
+    "retention": "Возвращаемость кошельков",
+    "retentionHint": "Новые кошельки за период, активные снова в один из следующих дней UTC в течение 7, 14 или 30 дней. Только полностью наблюдаемые интервалы.",
+    "history": "История по интервалам",
+    "historyHint": "Интервалы совпадают с графиками.",
+    "method": "Методика и источник",
+    "resync": "Загрузить всю историю",
+    "disclaimer": "Независимый дашборд сообщества, не официальный продукт Pepegun. Адреса кошельков не равны отдельным пользователям.",
+    "source": "Открыть в Tonviewer",
+    "loading": "Загрузка истории",
+    "refreshing": "Проверка новых данных",
+    "synced": "Обновлено",
+    "stale": "Сохранённые данные",
+    "unavailable": "Данные недоступны",
+    "partial": "Неполный период",
+    "incomplete": "Не завершён",
+    "complete": "Полный",
+    "refresh": "Обновить данные",
+    "language": "Язык",
+    "range": "Период",
+    "overview": "Основные показатели",
+    "wallets": "Уникальные кошельки",
+    "paying": "Платящие кошельки",
+    "revenue": "Доход с комиссий",
+    "payments": "Платежи комиссий",
+    "share": "от всех кошельков",
+    "avg": "Средняя комиссия",
+    "active": "Активные кошельки",
+    "today": "1 день",
+    "week": "7 дней",
+    "month": "30 дней",
+    "new": "Новые кошельки",
+    "returning": "Вернувшиеся",
+    "firstSeen": "Впервые в выбранном периоде",
+    "seenBefore": "Активны и замечены ранее",
+    "newShort": "Новые",
+    "returningShort": "Повторные",
+    "payingShort": "Платящие",
+    "allShort": "Все кошельки",
+    "fee": "Комиссии",
+    "day": "Дата (UTC)",
+    "activeShort": "Активные",
+    "count": "Платежи",
+    "other": "Другие переводы",
+    "cum": "Всего кошельков",
+    "cumPay": "Всего платящих",
+    "largest": "Крупнейшая комиссия",
+    "noData": "Нет подходящих данных за период",
+    "noHistory": "Ожидание проверенной истории блокчейна",
+    "noCache": "Не удалось загрузить проверенную историю. Нажмите обновление.",
+    "cachedError": "Обновление не удалось. Показан последний успешный снимок.",
+    "oldCache": "Данные старше 20 минут. Обновите страницу.",
+    "retry": "Лимит API — повтор запроса",
+    "downloading": "Загрузка транзакций",
+    "transactions": "транзакций",
+    "badRange": "Выберите корректные даты в пределах истории.",
+    "persist": "Хранилище браузера недоступно. Данные доступны в текущем сеансе.",
+    "noExport": "Не удалось создать файл в этом браузере.",
+    "more": "Показать ещё",
+    "less": "Свернуть",
+    "asOf": "Данные на",
+    "rolling": "Последние 24 часа",
+    "calendar7": "7 календарных дней UTC",
+    "calendar30": "30 календарных дней UTC",
+    "dateRange": "Выбранные даты UTC",
+    "scanned": "Проверено транзакций",
+    "provider": "Источник данных",
+    "coverage": "Полнота истории",
+    "verified": "Непрерывная история адреса",
+    "collector": "Комиссионный кошелёк",
+    "exportNote": "Кошельки — адреса, а не люди. Независимая ончейн-аналитика.",
+    "methodItems": [
+      "Данные одного публичного комиссионного кошелька в TON получаются через Toncenter API v3 или TonAPI v2. Полная выгрузка должна образовывать непрерывную цепочку до первой транзакции адреса.",
+      "Учитываются успешные входящие положительные переводы нативной валюты с распознанным префиксом комментария Pepegun. Возвращённые переводы и переводы самому себе исключаются. Повторы хешей и полных нормализованных адресов не учитываются. Комментарий сам по себе не подтверждает сделку.",
+      "Только комментарии с префиксом Pepegun fee относятся к платежам комиссий и валовому комиссионному доходу. Другие переводы Pepegun, в том числе крупные, учитываются в активности, но не в доходе. Платежи не равны числу сделок, а валовые комиссии — чистой прибыли.",
+      "Новые кошельки впервые появились в выбранном периоде. Вернувшиеся были замечены ранее и активны в нём. Накопительные итоги — уникальные адреса с начала наблюдения. Активность за 1, 7 и 30 дней рассчитана по календарным дням UTC до конца выбранного периода; эти окна могут начинаться раньше периода.",
+      "Все календарные даты — UTC. Фильтры 7 и 30 дней включают день последнего снимка и 6 или 29 предыдущих дней; 6 и 24 часа — скользящие интервалы. Графики используют адаптивные интервалы UTC; неполные интервалы отмечены. Сохранённые данные считаются только до последней успешной синхронизации.",
+      "Обновление при открытии, вручную, каждые 15 минут на открытой странице и при возврате в давно открытую вкладку. Браузер хранит последнюю проверенную историю; ежедневный публичный снимок ускоряет загрузку; платный API не используется. Доступность зависит от публичных индексаторов блокчейна."
+    ],
+    "median": "Медианная комиссия",
+    "perPayer": "Комиссии на платящий кошелёк",
+    "top5": "Доля комиссий топ-5",
+    "top10": "Доля комиссий топ-10",
+    "newPayers": "Новые платящие кошельки",
+    "repeatPayers": "Повторные платящие",
+    "comparison": "Сравнение с предыдущим периодом",
+    "compareHint": "Равный по длительности интервал UTC.",
+    "metric": "Показатель",
+    "current": "Сейчас",
+    "previous": "Ранее",
+    "delta": "Изменение",
+    "noComparison": "Недостаточно истории для равного предыдущего периода.",
+    "audit": "Сверка источников",
+    "auditButton": "Сверить оба индексатора",
+    "auditIdle": "Этот снимок ещё не сверялся",
+    "auditBusy": "Проверка второго индексатора…",
+    "auditMatch": "Источники совпадают на проверенном снимке",
+    "auditMismatch": "Источники расходятся — нужна проверка",
+    "auditUnavailable": "Второй индексатор не подтвердил снимок",
+    "ambiguous": "Нетипичные комментарии Pepegun (за всё время)",
+    "chainTip": "Время последней транзакции адреса",
+    "shortRules": "Принимается точный префикс Pepegun или Pepegun fee (необязательно 🔫), за которым следует метка через · или конец строки. Другие упоминания исключаются и учитываются отдельно. Совпадение источников проверяет индексаторы, а не подлинность сделок.",
+    "topHint": "Доля комиссионного дохода от адресов с наибольшей суммой комиссий за выбранный период.",
+    "h6": "6 ч.",
+    "rolling6": "Последние 6 часов",
+    "transactionsTitle": "Транзакции",
+    "transactionsHint": "Входящие переводы Pepegun за выбранный период со ссылками на Tonviewer.",
+    "filterAll": "Все",
+    "filterFee": "Комиссии",
+    "filterOther": "Другие",
+    "viewTx": "Смотреть транзакции",
+    "viewInterval": "Выбранный интервал",
+    "resetInterval": "Весь период",
+    "txEmpty": "Нет подходящих переводов",
+    "txTypeFee": "Комиссия",
+    "txTypeOther": "Другой перевод",
+    "interval": "Интервал",
+    "interval15": "15 мин",
+    "interval1": "1 час",
+    "interval3": "3 часа",
+    "interval6": "6 часов",
+    "intervalDay": "1 день",
+    "intervalWeek": "1 неделя",
+    "intervalMonth": "1 месяц",
+    "returnedWithin": "За",
+    "auditPrior": "Более ранний снимок",
+    "calendarWindows": "Календарные дни UTC",
+    "txShown": "Показано",
+    "of": "из",
+    "newPayShort": "Новые платящие",
+    "txLink": "Tonviewer"
+  }
 };
-const extraWords={"en":{"median":"Median fee","perPayer":"Fees per paying wallet","top5":"Top 5 share of fees","top10":"Top 10 share of fees","newPayers":"New paying wallets","repeatPayers":"Returning paying wallets","comparison":"Previous comparable period","compareHint":"Same elapsed UTC time in previous window; no comparison before observed history.","metric":"Metric","current":"Current","previous":"Previous","delta":"Change","noComparison":"Not enough history for an equivalent previous period. Try 7 days, 24h or 6h.","audit":"Source cross-check","auditButton":"Compare both indexers","auditIdle":"Not independently checked for this snapshot","auditBusy":"Checking alternate indexer…","auditMatch":"Both sources match","auditMismatch":"Sources disagree — review required","auditUnavailable":"Alternate indexer could not verify this snapshot","ambiguous":"Unclassified Pepegun comments (all time)","chainTip":"Account transaction time","shortRules":"Only the exact Pepegun or Pepegun fee prefix (optionally 🔫), followed by a middle-dot label or end of text, is accepted. Other mentions are excluded and counted separately. Source agreement validates the indexers, not trade identity.","topHint":"Share of labelled fee revenue from the highest-paying addresses in the selected period.","h6":"6h","rolling6":"Rolling 6 hours","daily":"Wallet activity","dailyHint":"Distinct addresses per interval","feesChart":"Fee revenue","feesHint":"Gross incoming fees · GRAM","retention":"Wallet return rates","retentionHint":"New wallets in the selected period active again on a later UTC day within 7, 14 or 30 days. Only fully observed follow-up windows count.","history":"Interval history","historyHint":"Same intervals as charts.","more":"Show more","less":"Show fewer","transactionsTitle":"Transactions","transactionsHint":"Incoming Pepegun transfers in the selected period, with links to Tonviewer.","filterAll":"All","filterFee":"Fees","filterOther":"Other","viewTx":"View transactions","viewInterval":"Selected interval","resetInterval":"Whole period","txEmpty":"No matching transfers","txTypeFee":"Fee","txTypeOther":"Other transfer","interval":"Interval","interval15":"15 min","interval1":"1 hour","interval3":"3 hours","interval6":"6 hours","intervalDay":"1 day","intervalWeek":"1 week","intervalMonth":"1 month","returnedWithin":"Within","noEligible":"Not enough history","auditPrior":"Earlier snapshot","calendarWindows":"UTC calendar windows","txShown":"Shown","of":"of","newPayShort":"New payers","txLink":"Tonviewer"},"ru":{"median":"Медианная комиссия","perPayer":"Комиссии на платящий кошелёк","top5":"Доля комиссий топ-5","top10":"Доля комиссий топ-10","newPayers":"Новые платящие кошельки","repeatPayers":"Повторные платящие","comparison":"Сравнение с предыдущим периодом","compareHint":"Сопоставимый интервал UTC; сравнение до начала наблюдений не проводится.","metric":"Показатель","current":"Сейчас","previous":"Ранее","delta":"Изменение","noComparison":"Недостаточно истории для равного предыдущего периода. Попробуйте 7 дней, 24 или 6 часов.","audit":"Сверка источников","auditButton":"Сверить оба индексатора","auditIdle":"Этот снимок ещё не сверялся","auditBusy":"Проверка второго индексатора…","auditMatch":"Оба источника совпадают","auditMismatch":"Источники расходятся — нужна проверка","auditUnavailable":"Второй индексатор не подтвердил снимок","ambiguous":"Нетипичные комментарии Pepegun (за всё время)","chainTip":"Время последней транзакции адреса","shortRules":"Принимается точный префикс Pepegun или Pepegun fee (необязательно 🔫), за которым следует метка через · или конец строки. Другие упоминания исключаются и учитываются отдельно. Совпадение источников проверяет индексаторы, а не подлинность сделок.","topHint":"Доля комиссионного дохода от адресов с наибольшей суммой комиссий за выбранный период.","h6":"6 ч.","rolling6":"Последние 6 часов","daily":"Активность кошельков","dailyHint":"Уникальные адреса за интервал","feesChart":"Комиссии","feesHint":"Входящие комиссии · GRAM","retention":"Возвращаемость кошельков","retentionHint":"Новые кошельки за период, активные снова в один из следующих дней UTC в течение 7, 14 или 30 дней. Только полностью наблюдаемые интервалы.","history":"История по интервалам","historyHint":"Интервалы совпадают с графиками.","more":"Показать ещё","less":"Свернуть","transactionsTitle":"Транзакции","transactionsHint":"Входящие переводы Pepegun за выбранный период со ссылками на Tonviewer.","filterAll":"Все","filterFee":"Комиссии","filterOther":"Другие","viewTx":"Смотреть транзакции","viewInterval":"Выбранный интервал","resetInterval":"Весь период","txEmpty":"Нет подходящих переводов","txTypeFee":"Комиссия","txTypeOther":"Другой перевод","interval":"Интервал","interval15":"15 мин","interval1":"1 час","interval3":"3 часа","interval6":"6 часов","intervalDay":"1 день","intervalWeek":"1 неделя","intervalMonth":"1 месяц","returnedWithin":"За","noEligible":"Недостаточно истории","auditPrior":"Более ранний снимок","calendarWindows":"Календарные дни UTC","txShown":"Показано","of":"из","newPayShort":"Новые платящие","txLink":"Tonviewer"}};Object.assign(words.en,extraWords.en);Object.assign(words.ru,extraWords.ru);
 const $=id=>document.getElementById(id);
 let lang="en";try{lang=localStorage.getItem("pepegun-lang")||(/^ru\b/i.test(navigator.language)?"ru":"en")}catch{}if(!words[lang])lang="en";
 const tr=k=>words[lang][k]||k,locale=()=>lang==="ru"?"ru-RU":"en-US",num=x=>new Intl.NumberFormat(locale()).format(x),fmt=(x,d=2)=>amount(x,d,locale()),pct=(a,b)=>b?new Intl.NumberFormat(locale(),{style:"percent",maximumFractionDigits:1}).format(a/b):"—";
@@ -42,14 +315,14 @@ const clock=t=>new Date(t).toISOString().slice(11,16);
 const intervalName=k=>tr(({"15m":"interval15","1h":"interval1","3h":"interval3","6h":"interval6",day:"intervalDay",week:"intervalWeek",month:"intervalMonth"})[k]);
 const granularity=()=>series.kind;
 const hourly=()=>["15m","1h","3h","6h"].includes(series.kind);
-function axisLabel(b){return hourly()?(series.kind==="15m"||series.kind==="1h"?clock(b.bucket):shortDate(b.date)+" "+clock(b.bucket)):series.kind==="month"?b.date.slice(0,7):shortDate(b.date)}
+function axisLabel(b){return hourly()?(series.kind==="15m"||series.kind==="1h"?(dayIndex(series.bins[0].bucket)===dayIndex(series.bins.at(-1).bucket)?clock(b.bucket):shortDate(b.date)+" "+clock(b.bucket)):shortDate(b.date)+" "+clock(b.bucket)):series.kind==="month"?b.date.slice(0,7):shortDate(b.date)}
 function intervalLabel(b){const a=b.start,z=b.end-1;if(hourly())return utcDate(a)+" "+clock(a)+" — "+(dayIndex(a)===dayIndex(b.end)?"":utcDate(b.end)+" ")+clock(b.end);return dayIndex(a)===dayIndex(z)?utcDate(a,true):utcDate(a)+" — "+utcDate(z,true)}
 function exportDateLabel(){return range?(selected==="6h"||selected==="24h"?time(range.from)+" — "+time(range.to-1):dateLabel()+" · UTC"):""}
 const statusLabel=s=>s==="partial"?tr("partial"):s==="incomplete"?tr("incomplete"):tr("complete");
 let cache=null,selected="all",m=null,range=null,busy=true,error=false,storageError=false,exportError=false,progress=null,resizeTimer;
-let pointsState={},audit=null,auditing=false,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
+let pointsState={},pointBuckets={},audit=null,auditing=false,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
 function stale(){return !!cache&&(error||Date.now()-cache.asOf>STALE)}
-function language(){document.documentElement.lang=lang;document.querySelectorAll("[data-i]").forEach(el=>el.textContent=tr(el.dataset.i));const switchLabel=lang==="ru"?"Switch to English":"Переключить на русский";$("language").textContent=lang==="ru"?"EN":"RU";$("language").setAttribute("aria-label",switchLabel);$("language").title=switchLabel;$("refresh").setAttribute("aria-label",tr("refresh"));$("refresh").title=tr("refresh");$("filters").setAttribute("aria-label",tr("range"));$("overview").setAttribute("aria-label",tr("overview"));$("active").setAttribute("aria-label",tr("active"));}
+function language(){document.documentElement.lang=lang;document.querySelectorAll("[data-i]").forEach(el=>el.textContent=tr(el.dataset.i));const switchLabel=lang==="ru"?"Switch to English":"Переключить на русский";$("language").textContent=lang==="ru"?"EN":"RU";$("language").setAttribute("aria-label",switchLabel);$("language").title=switchLabel;$("refresh").setAttribute("aria-label",tr("refresh"));$("refresh").title=tr("refresh");$("filters").setAttribute("aria-label",tr("range"));$("tx-filters").setAttribute("aria-label",lang==="ru"?"Тип транзакции":"Transaction type");$("overview").setAttribute("aria-label",tr("overview"));$("active").setAttribute("aria-label",tr("active"));}
 function updateStatus(){
  const isOld=stale(),s=$("status"),label=busy?(cache?tr("refreshing"):tr("loading")):cache?(isOld?tr("stale"):tr("synced")):tr("unavailable");
  s.className="status "+(busy?"loading":cache?(isOld?"stale":""):"error");$("status-text").textContent=label;$("updated").textContent=cache?syncTime(cache.asOf):"";
@@ -113,7 +386,7 @@ function drawChart(id,data,series,kind,decimal){
  for(let i=0;i<=ticks;i++){const v=i*step,py=y(v);svg+='<path d="M'+L+' '+py+'H'+(W-R)+'" stroke="'+colors.grid+'" stroke-width="1"/><text x="'+(L-5)+'" y="'+(py+4)+'" fill="'+colors.text+'" text-anchor="end" font-size="10">'+esc(fnum(v,step))+'</text>'}
  const tickCount=hourly()?(W<480?3:5):W<340?4:W<550?5:7,stepX=Math.max(1,Math.ceil((data.length-1)/(tickCount-1)));
  let idxs=[];for(let i=0;i<data.length;i+=stepX)idxs.push(i);if(idxs.at(-1)!==data.length-1){if(data.length-1-idxs.at(-1)<stepX*.55&&idxs.length>1)idxs.pop();idxs.push(data.length-1)}
- for(const i of idxs){const edge=hourly()&&["3h","6h"].includes(granularity())?28:15;const px=Math.min(W-R-edge,Math.max(L+edge,x(i)));svg+='<text x="'+px+'" y="'+(H-7)+'" text-anchor="middle" font-size="10" fill="'+colors.text+'">'+esc(axisLabel(data[i]))+'</text>'}
+ for(const i of idxs){const edge=hourly()?32:15;const px=Math.min(W-R-edge,Math.max(L+edge,x(i)));svg+='<text x="'+px+'" y="'+(H-7)+'" text-anchor="middle" font-size="10" fill="'+colors.text+'">'+esc(axisLabel(data[i]))+'</text>'}
  const isPartial=r=>r.status!=="complete";
  if(kind==="bar"||kind==="stack"){
   data.forEach((r,i)=>{let prev=0;const bw=Math.max(.6,Math.min(cell*.7,24));for(const s of series.filter(z=>!z.line)){const v=val(r,s);if(v>0){const top=y(prev+v),h=y(prev)-top;svg+='<rect x="'+(x(i)-bw/2)+'" y="'+top+'" width="'+bw+'" height="'+h+'" rx="'+Math.min(2,bw/4)+'" fill="'+s.color+'" opacity="'+(isPartial(r)?.48:1)+'"/>'}prev+=v}});
@@ -129,8 +402,8 @@ function drawChart(id,data,series,kind,decimal){
  svg+='<line class="cursor" x1="0" x2="0" y1="'+T+'" y2="'+(T+plotH)+'" stroke="#adb9ae" stroke-dasharray="3 3" opacity=".5"/></svg>';
  root.innerHTML=svg+'<div class="chart-legend">'+series.map(s=>'<span><i class="swatch" style="background:'+s.color+'"></i>'+esc(s.label)+'</span>').join("")+'</div><div class="chart-readout" aria-live="polite"></div><button type="button" class="chart-tx">'+esc(tr("viewTx"))+' ↗</button>';
  const graphic=root.querySelector("svg"),cursor=root.querySelector(".cursor"),readout=root.querySelector(".chart-readout");
- function focus(i){i=Math.max(0,Math.min(data.length-1,i));pointsState[id]=i;const r=data[i];cursor.setAttribute("x1",x(i));cursor.setAttribute("x2",x(i));readout.innerHTML='<strong>'+esc(intervalLabel(r))+'</strong>'+(isPartial(r)?" · "+esc(statusLabel(r.status)):"")+" · "+series.map(s=>esc(s.label)+": <strong>"+esc(s.key==="fee"?money(r.fee)+" GRAM":num(val(r,s)))+"</strong>").join(" · ")}
- focus(Math.min(pointsState[id]??data.length-1,data.length-1));
+ function focus(i){i=Math.max(0,Math.min(data.length-1,i));pointsState[id]=i;const r=data[i];pointBuckets[id]=i===data.length-1?null:r.bucket;cursor.setAttribute("x1",x(i));cursor.setAttribute("x2",x(i));readout.innerHTML='<strong>'+esc(intervalLabel(r))+'</strong>'+(isPartial(r)?" · "+esc(statusLabel(r.status)):"")+" · "+series.map(s=>esc(s.label)+": <strong>"+esc(s.key==="fee"?money(r.fee)+" GRAM":num(val(r,s)))+"</strong>").join(" · ")}
+ const saved=pointBuckets[id];const index=saved==null?-1:data.findIndex(b=>b.bucket===saved);focus(index<0?data.length-1:index);
  root.querySelector(".chart-tx").addEventListener("click",()=>{const r=data[pointsState[id]??data.length-1];if(r)openTransactions({from:r.start,to:r.end},id==="fees-chart"?"fee":"all")});
  let activePointer=null;
  function pointer(e){const rect=graphic.getBoundingClientRect();if(!rect.width)return;const px=(e.clientX-rect.left)*W/rect.width;const i=Math.max(0,Math.min(data.length-1,Math.floor((px-L)/cell)));if(pointsState[id]!==i)focus(i)}
@@ -242,8 +515,8 @@ async function refresh(force=false){
  finally{busy=false;render()}
 }
 $("language").addEventListener("click",()=>{lang=lang==="ru"?"en":"ru";try{localStorage.setItem("pepegun-lang",lang)}catch{}render()});
-document.querySelectorAll("[data-range]").forEach(b=>b.addEventListener("click",()=>{selected=b.dataset.range;historyLimit=14;txRange=null;txLimit=20;pointsState={};render()}));
-for(const id of ["from","to"])$(id).addEventListener("change",()=>{pointsState={};historyLimit=14;txRange=null;txLimit=20;render()});
+document.querySelectorAll("[data-range]").forEach(b=>b.addEventListener("click",()=>{selected=b.dataset.range;historyLimit=14;txRange=null;txLimit=20;pointsState={};pointBuckets={};render()}));
+for(const id of ["from","to"])$(id).addEventListener("change",()=>{pointsState={};pointBuckets={};historyLimit=14;txRange=null;txLimit=20;render()});
 $("more").addEventListener("click",()=>{historyLimit=historyLimit>=series.bins.length?14:historyLimit+30;renderDetails()});
 $("tx-filters").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{txType=b.dataset.txType;txLimit=20;renderTransactions()}));
 $("tx-reset").addEventListener("click",()=>{txRange=null;txLimit=20;renderTransactions()});
@@ -252,4 +525,4 @@ $("audit-check").addEventListener("click",auditSources);$("refresh").addEventLis
 window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(renderCharts,100)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!busy&&(!cache||Date.now()-cache.asOf>=REFRESH))refresh()});
 setInterval(()=>{if(!busy&&document.visibilityState==="visible")refresh()},REFRESH);setInterval(updateStatus,60000);
-render();loadCache().then(async c=>{if(c){cache=c;render()}const seed=await loadSeed();cache=c&&seed?(BigInt(c.tip)>=BigInt(seed.tip)?c:seed):c||seed;if(seed?.audit&&cache&&(!cache.audit||seed.audit.asOf>cache.audit.asOf))cache.audit=seed.audit;busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});
+render();loadCache().then(async c=>{if(c){cache=c;render()}const seed=await loadSeed();cache=selectSnapshot(c,seed);if(cache&&validAudit(seed?.audit,cache.tip)&&(!cache.audit||seed.audit.asOf>cache.audit.asOf))cache.audit=seed.audit;busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});

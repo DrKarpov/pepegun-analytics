@@ -1,4 +1,4 @@
-import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,exact,weekIndex,weekStart} from "./analytics.mjs?v=8";
+import {DAY,dayIndex,dayKey,cacheFrom,verify,ordered,RAW,VERSION,compareLt,minimizeTransaction,unpackTransaction,validAudit,validCache,exact,weekIndex,weekStart} from "./analytics.mjs?v=9";
 export function extraMetrics(rows,range,now){
  const to=Math.min(range.to,now+1),from=range.from,firstPay=new Map(),feeValues=[],byWallet=new Map(),newPayers=new Set(),payByDay=new Map();let total=0n;
  for(const r of rows){const t=r.t*1000;if(t>=to||r.k!=="fee")continue;if(!firstPay.has(r.s)||firstPay.get(r.s)>t)firstPay.set(r.s,t);if(t<from)continue;const v=BigInt(r.v);feeValues.push(v);total+=v;byWallet.set(r.s,(byWallet.get(r.s)||0n)+v);}
@@ -55,9 +55,16 @@ export function validateSeed(s){
  const unpacked=s.transactions.map(unpackTransaction),txs=ordered(unpacked);
  if(txs.length!==unpacked.length||!verify(txs,"0")||txs.some(t=>!Number.isSafeInteger(t.t)||t.t<=0||t.t*1000>s.asOf||!/^[0-9a-f]{64}$/.test(t.h)||!/^\d+$/.test(t.lt)||!/^\d+$/.test(t.prev)||typeof t.success!=="boolean"||(t.m&&(!/^\d+$/.test(t.m.v)||typeof t.m.c!=="string"||!/^-?\d+:[0-9a-f]{64}$/.test(t.m.s)))))return null;
  const c=cacheFrom(txs.map(minimizeTransaction),s.source,null,s.asOf);
- if(s.audit&&["match","mismatch","unavailable"].includes(s.audit.status)&&s.audit.tip===c.tip&&Number.isFinite(s.audit.asOf))c.audit={status:s.audit.status,tip:s.audit.tip,source:s.audit.source,asOf:s.audit.asOf};
- return c;
+ if(validAudit(s.audit,c.tip))c.audit={status:s.audit.status,tip:s.audit.tip,source:s.audit.source,asOf:s.audit.asOf};
+ return validCache(c)?c:null;
  }catch{return null}
+}
+export function selectSnapshot(local,seed){
+ if(!local)return seed;if(!seed)return local;
+ const order=compareLt(local.tip,seed.tip);
+ if(order!==0)return order>0?local:seed;
+ if(local.tipHash!==seed.tipHash)return seed.audit?.status==="match"?seed:local;
+ return seed.asOf>local.asOf?seed:local;
 }
 export async function loadSeed(){
  const urls=["https://raw.githubusercontent.com/DrKarpov/pepegun-analytics/main/docs/snapshot.json",new URL("./snapshot.json",import.meta.url)];

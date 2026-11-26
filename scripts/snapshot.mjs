@@ -12,10 +12,10 @@ for(const source of ["toncenter","tonapi"]){
  const asOf=Date.now(),cache=cacheFrom(transactions,source,null,asOf);
  let audit;
  try{audit=await crossCheck(cache)}catch{audit={status:"unavailable",tip:cache.tip,asOf:Date.now()}}
- if(audit.status==="mismatch")throw Error("Indexers disagree at the same transaction tip");
+ if(audit.status==="mismatch")throw Object.assign(Error("Indexers disagree at the same transaction tip"),{sourceMismatch:true});
  const snapshot={version:VERSION,address:RAW,source,asOf,audit,transactions:transactions.map(packTransaction)};
  await writeFile(tmp,JSON.stringify(snapshot));await rename(tmp,file);
  console.log("Snapshot:",ADDRESS,transactions.length,audit.status);last=null;break;
- }catch(e){last=e;console.error(source,e.message)}
+ }catch(e){if(e.sourceMismatch)throw e;last=e;console.error(source,e.message)}
 }
 if(last)throw last;
