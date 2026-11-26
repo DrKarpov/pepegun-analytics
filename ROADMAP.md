@@ -1,14 +1,14 @@
 # Pepegun Analytics — technical roadmap
 
-Updated 2026-11-26. Baseline: v29, commit 6eedcb502bddc08581e9a0d269e55ce1b3721a08; latest main at P2-07 start: d012727dfc8a88f7c611ec54c84952136303a168 (snapshot-only updates may follow).
+Updated 2026-11-26. Baseline: v29, commit 6eedcb502bddc08581e9a0d269e55ce1b3721a08; latest main at P3 start: 68c8a0da7a5b4293395bdf1018f117f03e6a6a9f (snapshot-only updates may follow).
 
 Goal: strengthen reliability and maintainability without redesigning the approved dashboard or introducing paid infrastructure. This roadmap preserves the 15 tasks from the v28 audit. Documentation handoff is not implementation progress.
 
 ## Status and resume pointer
 
 - Cosmetic phase v29: complete. P1 and P2-01/02 merged, tested with real complete history and both browsers. Recovery of the erroneous unavailable status merged in d6c8042; user confirmed “Обновлено” on the live site. Automatic snapshot generation subsequently published a full match (5ebb7f9 and f261e52). Startup presentation outside roadmap merged in 2f9a5b3 after CI 45889000113; production rendering not independently checked.
-- Progress: 10 / 15 implemented and verified; 5 remain (browser coverage for P3-04 partially implemented).
-- Next: P2-07 in work/p2-07-csp; code/test checkpoint 1daa072f1d2467cc24411a868a842bb16cfd4467. Early meta CSP: default deny, self scripts, self styles + inline attributes, self/blob images, self + Toncenter + TonAPI + exact raw snapshot fetch path. Block inline/foreign scripts, arbitrary network/images, base changes, objects, frames, workers and forms; no data images/eval. Legacy style-src fallback permits inline style; meta cannot enforce frame-ancestors or report-only. Actual browser enforcement/fallback/export and existing regressions pending CI. Then P3; prioritize P3-04 coverage before visual/refactor work.
+- Progress: 11 / 15 implemented and verified in main. All four P3 tasks have candidate implementations in one branch; no completion claim before CI and merge.
+- Resume: P3 combined branch work/p3-final, checkpoint 054a56ad314a80ce43970638cdd697f9f022b792. P3-04 pinned baseline browser comparisons, P3-01 conservative CSS consolidation, P3-02 i18n/chart/palette/global PNG extraction, P3-03 README/handoff. Verify existing suites and new comparisons, address any actual failures, then squash merge and record final evidence/status in docs. Native iOS acceptance and production deployment are separate.
 - State vocabulary: TODO, IN PROGRESS, BLOCKED, VERIFIED (branch), DONE (main + verification). A code change without required tests is not DONE.
 
 ## Stage 1 — P1: data reliability (4/4)
@@ -22,7 +22,7 @@ Goal: strengthen reliability and maintainability without redesigning the approve
 
 Stage gate: evidence-backed source contracts, migration and failure handling, metric reconciliation against a fixed snapshot, reviewed diff, successful CI and documented residual limitations. Do not publish a new schema that breaks existing deployed clients.
 
-## Stage 2 — P2: performance, resilience, UX, security (6/7)
+## Stage 2 — P2: performance, resilience, UX, security (7/7)
 
 | ID | Task | Acceptance criteria | Dependencies | Status |
 |---|---|---|---|---|
@@ -32,7 +32,7 @@ Stage gate: evidence-backed source contracts, migration and failure handling, me
 | P2-04 | Prevent accidental chart selection while scrolling | Vertical swipe does not select a point; intentional tap/drag, mouse and keyboard still work; long press export unaffected. | Stage 1 gate | DONE |
 | P2-05 | Improve returning-wallet graph contrast | At least 3:1 on relevant adjacent background, same restrained palette; consistency on live chart and both exports. | Stage 1 gate | DONE |
 | P2-06 | Clarify PNG time and activity scopes | All six individual cards RU/EN: accurate range/anchor; UTC once beside actual time, never beside date-only label; omit routine prior-history status; retain material trust/stale warnings separately; no timestamp/footer restoration; preview equals PNG. | Stage 1 gate | DONE |
-| P2-07 | Add CSP | Restrict resource/network origins, maintain required API and snapshot fallback, canvas/SVG/blob exports, inline dynamic style compatibility; verify in browser. | Stage 1 gate | IN PROGRESS |
+| P2-07 | Add CSP | Restrict resource/network origins, maintain required API and snapshot fallback, canvas/SVG/blob exports, inline dynamic style compatibility; verify in browser. | Stage 1 gate | DONE |
 
 Stage gate: source integrity retained, no paid infrastructure, no visual redesign, tested failure paths and key interactions; actual browser checks or explicit blocker.
 
@@ -40,9 +40,9 @@ Stage gate: source integrity retained, no paid infrastructure, no visual redesig
 
 | ID | Task | Acceptance criteria | Dependencies | Status |
 |---|---|---|---|---|
-| P3-01 | Consolidate CSS | Remove redundant overrides in small batches; compare baseline desktop/mobile RU/EN and modal/hold states; no layout regressions. | P3-04 baseline tests recommended first | TODO |
-| P3-02 | Modularize app.mjs | Separate coherent concerns with clear dependencies, retain all features and exact calculations, safe cache-busting/versioned imports. | P3-04 baseline tests recommended first | TODO |
-| P3-03 | Maintain README and context | Accurate setup, architecture, methodology, operational commands, current statuses and limitations. Update throughout, finalize after changes. | All relevant changes | TODO |
+| P3-01 | Consolidate CSS | Remove redundant overrides in small batches; compare baseline desktop/mobile RU/EN and modal/hold states; no layout regressions. | P3-04 baseline tests recommended first | IN PROGRESS |
+| P3-02 | Modularize app.mjs | Separate coherent concerns with clear dependencies, retain all features and exact calculations, safe cache-busting/versioned imports. | P3-04 baseline tests recommended first | IN PROGRESS |
+| P3-03 | Maintain README and context | Accurate setup, architecture, methodology, operational commands, current statuses and limitations. Update throughout, finalize after changes. | All relevant changes | IN PROGRESS |
 | P3-04 | Add automated browser tests | Repeatable Chromium and available WebKit checks for core flows, both languages, narrow/desktop screens, preview and download, gesture/failure states; document native iOS limits. | Start baseline coverage before visual/refactor changes | IN PROGRESS |
 
 Test infrastructure can be introduced earlier to protect P1/P2. Stage numbering is priority, not a prohibition on prerequisite tests. Do not do unrelated cleanup in an integrity change.
@@ -84,6 +84,12 @@ Test infrastructure can be introduced earlier to protect P1/P2. Stage numbering 
 
 | 2026-11-26 | P2-06 verified and merged | [d012727](https://github.com/drkarpov/pepegun-analytics/commit/d012727dfc8a88f7c611ec54c84952136303a168) | [CI 45895586596](https://github.com/drkarpov/pepegun-analytics/actions/runs/45895586596) passed Node, full 3738/3446, incremental 2 vs 38 requests, both browsers, six-card RU/EN periods, warning and exact preview/download pixel checks. Earlier CI failures: helper name shadowing and close-event synchronization; fixed in 4b40eda and f2adb73. | DONE in main; live iPhone confirmation not received. Individual routine prior status omitted; material warnings retained. |
 | 2026-11-26 | P2-07 candidate | [1daa072](https://github.com/drkarpov/pepegun-analytics/commit/1daa072f1d2467cc24411a868a842bb16cfd4467) | Added actual CSP meta and both-browser enforcement/fallback tests; converted test-only data image decodes to blob; assert no legitimate CSP violations. CI pending. | No UI, analytics or export implementation changes. Static meta limitations and inline attribute compatibility documented. |
+
+| 2026-11-26 | P2-07 verified and merged | [68c8a0d](https://github.com/drkarpov/pepegun-analytics/commit/68c8a0da7a5b4293395bdf1018f117f03e6a6a9f) | [CI 45897560122](https://github.com/drkarpov/pepegun-analytics/actions/runs/45897560122) passed both engines, actual denied resources, provider/local snapshot fallback, export paths, full 3738/3446 and incremental 2 vs 38 requests. Earlier test harness eval and WebKit screenshot-only empty style conflicts corrected without weakening CSP. | DONE; no backend. Native device acceptance separate. |
+| 2026-11-26 | P3-04 baseline test implementation | [cc2c375](https://github.com/drkarpov/pepegun-analytics/commit/cc2c375f662dd285305537edd88b5bcf535a03a6), [af20a79](https://github.com/drkarpov/pepegun-analytics/commit/af20a796ded4499d2d8c662bb76cbb93456a4427), [f849bf2](https://github.com/drkarpov/pepegun-analytics/commit/f849bf22e5f1071599361803db91012f9ba5951d) | Added baseline-vs-candidate actual browser comparisons, 6 widths × RU/EN, screenshots, computed styles, chart SVG, exact CSV and PNG pixels, modal and hold, simulated clipboard denial. Existing tests retained. | CI pending; pinned last verified P2 commit, no moving snapshot. |
+| 2026-11-26 | P3-01 CSS consolidation | [eebbea2](https://github.com/drkarpov/pepegun-analytics/commit/eebbea231497f45384e83ce7d5b4b380f0b07bce) | Removed 1106 characters of superseded declarations and duplicate preview rules; retained breakpoint and fallback order. | CI baseline comparison pending; deliberately conservative, not a redesign. |
+| 2026-11-26 | P3-02 focused modules | [43b6750](https://github.com/drkarpov/pepegun-analytics/commit/43b67500df5af39151d0798d1a96c8a731cfe374), [a5da781](https://github.com/drkarpov/pepegun-analytics/commit/a5da7816d607b971f59973cc2215ef3253073915) | Extracted i18n, SVG renderer with private selection/gesture state, shared chart palette and global PNG renderer. app.mjs shrunk from 51876 to about 21300 characters. No analytics/schema changes. Version v39. | CI pending. |
+| 2026-11-26 | P3-03 documentation | [054a56a](https://github.com/drkarpov/pepegun-analytics/commit/054a56ad314a80ce43970638cdd697f9f022b792) | README architecture, data definitions, CSP, commands, comparison and device limits refreshed. | Candidate handoff updated; finalize verification status after successful CI/merge. |
 
 After each work unit add an entry with exact commit, changed files or linked diff, tests actually executed and their results, blockers, and next action. Update status and resume pointer in the same commit where practical. If a task is only proposed, leave it TODO. Keep previous entries. See DEVELOPMENT_RULES.md.
 
