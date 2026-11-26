@@ -1,6 +1,6 @@
-import {setupCardExport} from "./card-export.mjs?v=28";
-import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,validAudit} from "./analytics.mjs?v=10";
-import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=10";
+import {setupCardExport} from "./card-export.mjs?v=30";
+import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,compactAmount,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=30";
+import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=30";
 const words={
   "en": {
     "subtitle": "Independent on-chain analytics",
@@ -152,6 +152,10 @@ const words={
     "intervalMonth": "1 month",
     "returnedWithin": "Within",
     "auditPrior": "Earlier snapshot",
+    "trustMismatch": "Sources disagree",
+    "trustPrior": "Earlier history checked",
+    "trustUnavailable": "Cross-check unavailable",
+    "trustUnchecked": "Not cross-checked",
     "calendarWindows": "UTC calendar windows",
     "txShown": "Shown",
     "of": "of",
@@ -308,6 +312,10 @@ const words={
     "intervalMonth": "1 месяц",
     "returnedWithin": "За",
     "auditPrior": "Более ранний снимок",
+    "trustMismatch": "Источники расходятся",
+    "trustPrior": "Проверена ранняя история",
+    "trustUnavailable": "Сверка недоступна",
+    "trustUnchecked": "Без сверки источников",
     "calendarWindows": "Календарные дни UTC",
     "txShown": "Показано",
     "of": "из",
@@ -333,20 +341,22 @@ function intervalLabel(b){const a=b.start,z=b.end-1;if(hourly())return utcDate(a
 function exportDateLabel(){return range?(selected==="6h"||selected==="24h"?time(range.from)+" — "+time(range.to-1):dateLabel()+" · UTC"):""}
 const statusLabel=s=>s==="partial"?tr("partial"):s==="incomplete"?tr("incomplete"):tr("complete");
 let cache=null,selected="all",m=null,range=null,busy=true,error=false,storageError=false,exportError=false,progress=null,resizeTimer;
-let pointsState={},pointBuckets={},audit=null,auditing=false,auditProgress=null,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
+let pointsState={},pointBuckets={},auditing=false,auditProgress=null,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
+const trustLabel=(trust=auditTrust(cache))=>({mismatch:"trustMismatch",prior:"trustPrior",unavailable:"trustUnavailable",unchecked:"trustUnchecked"}[trust]);
 function stale(){return !!cache&&(error||Date.now()-cache.asOf>STALE)}
 function language(){document.documentElement.lang=lang;document.querySelectorAll("[data-i]").forEach(el=>el.textContent=tr(el.dataset.i));const switchLabel=lang==="ru"?"Switch to English":"Переключить на русский";$("language").textContent=lang==="ru"?"EN":"RU";$("language").setAttribute("aria-label",switchLabel);$("language").title=switchLabel;$("refresh").setAttribute("aria-label",tr("refresh"));$("refresh").title=tr("refresh");$("filters").setAttribute("aria-label",tr("range"));$("tx-filters").setAttribute("aria-label",lang==="ru"?"Тип транзакции":"Transaction type");$("overview").setAttribute("aria-label",tr("overview"));$("active").setAttribute("aria-label",tr("active"));}
 function updateStatus(){
- const isOld=stale(),s=$("status"),label=busy?(cache?tr("refreshing"):tr("loading")):cache?(isOld?tr("stale"):tr("synced")):tr("unavailable");
- s.className="status "+(busy?"loading":cache?(isOld?"stale":""):"error");$("status-text").textContent=label;$("updated").textContent=cache?syncTime(cache.asOf):"";
+ const isOld=stale(),trust=auditTrust(cache),warning=trustLabel(trust),s=$("status"),label=cache&&trust==="mismatch"?tr(warning):busy?(cache?tr("refreshing"):tr("loading")):cache?(isOld?tr("stale"):warning?tr(warning):tr("synced")):tr("unavailable");
+ s.className="status "+(trust==="mismatch"?"error":busy?"loading":cache?(isOld||warning?"stale":""):"error");$("status-text").textContent=label;$("updated").textContent=cache?syncTime(cache.asOf):"";
  $("refresh").classList.toggle("loading",busy);$("refresh").disabled=busy;$("resync").disabled=busy;
  let note="";
  if(busy&&!cache&&progress)note=progress.retry?tr("retry"):tr("downloading")+" · "+num(progress.scanned||0)+" "+tr("transactions");
  else if(error)note=tr(cache?"cachedError":"noCache");
  else if(isOld)note=tr("oldCache");
+ if(cache&&warning&&(trust==="mismatch"||isOld||busy))note+=(note?" ":"")+tr(warning);
  if(storageError)note+=(note?" ":"")+tr("persist");
  if(exportError)note+=(note?" ":"")+tr("noExport");
- $("notice").hidden=!note;$("notice").className="notice "+(error&&!cache?"error":"");$("notice").textContent=note;
+ $("notice").hidden=!note;$("notice").className="notice "+(error&&!cache||trust==="mismatch"?"error":"");$("notice").textContent=note;
 }
 const kpi=(label,value,hint="",accent=false,unit="")=>'<article class="kpi'+(accent?' primary':'')+'"><div class="kpi-label">'+esc(label)+'</div><div class="kpi-value">'+esc(value)+'</div><div class="kpi-hint">'+(unit?'<small class="kpi-unit">'+esc(unit)+'</small>':'')+(unit&&hint?' · ':'')+esc(hint)+'</div></article>';
 const placeholder=(message=tr(cache?"noData":"noHistory"))=>'<div class="placeholder">'+esc(message)+'</div>';
@@ -479,8 +489,8 @@ async function copyCollectorAddress(button){
 $("method").addEventListener("click",event=>{const button=event.target.closest("#copy-address");if(button&&!button.classList.contains("copied"))copyCollectorAddress(button)});
 
 function renderExtras(){
- const check=(!audit||cache?.audit?.asOf>audit.asOf)?cache?.audit:audit;
- const state=auditing?"auditBusy":check?({match:"auditMatch",mismatch:"auditMismatch",unavailable:"auditUnavailable"}[check.status]||"auditIdle"):"auditIdle";
+ const check=cache?.audit,trust=auditTrust(cache);
+ const state=auditing&&trust!=="mismatch"?"auditBusy":({match:"auditMatch",prior:"auditMatch",mismatch:"auditMismatch",unavailable:"auditUnavailable",unchecked:"auditIdle"}[trust]);
  $("audit-result").textContent=tr(state)+(check&&!auditing?" · "+time(check.asOf)+(cache&&check.tip!==cache.tip?" · "+tr("auditPrior"):""):"");
  $("audit-result").className="sub "+(state==="auditMismatch"?"audit-warn":"");
  const auditButton=$("audit-check");auditButton.disabled=!cache||auditing;auditButton.classList.toggle("audit-running",auditing);auditButton.setAttribute("aria-busy",String(auditing));auditButton.textContent=tr(auditing?"auditBusy":"auditButton");
@@ -489,7 +499,16 @@ function renderExtras(){
  $("audit-progress").textContent=auditing&&p?((p.source==="tonapi"?"TonAPI v2":"Toncenter API v3")+" · "+tr("auditPages")+": "+num(p.pages)+" · "+tr("auditScanned")+": "+num(p.scanned)+(p.retry?" · "+tr("auditRetry"):"")):"";
  $("audit-meta").textContent=cache?tr("ambiguous")+": "+num(cache.ambiguous)+" · "+tr("chainTip")+": "+time(cache.tipTime*1000):"";
 }
-async function auditSources(){if(!cache||auditing)return;const snapshot=cache;auditing=true;auditProgress={source:snapshot.source==="toncenter"?"tonapi":"toncenter",pages:0,scanned:0,retry:false};renderExtras();try{audit=await crossCheck(snapshot,p=>{auditProgress={...auditProgress,...p,retry:!!p.retry};renderExtras()})}catch{audit={status:"unavailable",asOf:Date.now(),tip:snapshot.tip}}finally{if(cache&&validAudit(audit,cache.tip)&&(!cache.audit||audit.asOf>=cache.audit.asOf)){cache.audit=audit;await saveCache(cache)}auditing=false;auditProgress=null;renderExtras()}}
+async function auditSources(){
+ if(!cache||auditing)return;
+ const snapshot=cache;auditing=true;auditProgress={source:snapshot.source==="toncenter"?"tonapi":"toncenter",pages:0,scanned:0,retry:false};renderExtras();
+ let result;
+ try{result=await crossCheck(snapshot,p=>{auditProgress={...auditProgress,...p,retry:!!p.retry};renderExtras()})}catch{result=auditResult(snapshot,"unavailable")}
+ finally{
+  if(cache){cache={...cache,audit:mergeAudit(cache,result)};updateStatus();await saveCache(cache)}
+  auditing=false;auditProgress=null;renderExtras();updateStatus();
+ }
+}
 function renderTransactions(){
  const r=txRange||range,valid=!!m&&!!r;
  $("tx-filters").querySelectorAll("button").forEach(b=>{b.disabled=!valid;b.setAttribute("aria-pressed",String(b.dataset.txType===txType))});
@@ -505,12 +524,12 @@ function download(blob,name){const url=URL.createObjectURL(blob),a=document.crea
 function exportCsv(){
  if(!m||!cache)return;
  exportError=false;updateStatus();
- try{download(new Blob(["\ufeff"+intervalCsv(series,cache.asOf,stale())],{type:"text/csv;charset=utf-8"}),"pepegun-"+selected+"-"+m.anchor+".csv")}
+ try{download(new Blob(["\ufeff"+intervalCsv(series,cache.asOf,stale(),auditTrust(cache))],{type:"text/csv;charset=utf-8"}),"pepegun-"+selected+"-"+m.anchor+".csv")}
  catch{exportError=true;updateStatus()}
 }
 async function exportPng(){
  if(!m||!cache)return;
- const snapshot=m,exportSeries=series,asOf=cache.asOf,old=stale(),label=exportDateLabel(),currentLang=lang,exportPreset=selected,canvas=document.createElement("canvas");canvas.width=2400;canvas.height=1840;const g=canvas.getContext("2d");if(!g)throw Error("Canvas unavailable");g.scale(2,2);const W=1200,H=920;
+ const snapshot=m,exportSeries=series,asOf=cache.asOf,old=stale(),trust=trustLabel(),label=exportDateLabel(),currentLang=lang,exportPreset=selected,canvas=document.createElement("canvas");canvas.width=2400;canvas.height=1840;const g=canvas.getContext("2d");if(!g)throw Error("Canvas unavailable");g.scale(2,2);const W=1200,H=920;
  const palette={bg:"#101211",card:"#171a18",border:"#292e2b",muted:"#a1aaa3",text:"#edf1ee",green:"#b5ef58",paid:"#71c5b3"};
  const font=(n,b=false)=> (b?"600 ":"400 ")+n+"px system-ui, sans-serif";
  function txt(s,x,y,n=16,c=palette.text,b=false,max=Infinity){g.font=font(n,b);while(g.measureText(s).width>max&&n>9)g.font=font(--n,b);g.fillStyle=c;g.fillText(s,x,y)}
@@ -518,7 +537,7 @@ async function exportPng(){
  g.fillStyle=palette.bg;g.fillRect(0,0,W,H);
  try{const im=new Image();im.src="./pepegun-logo.svg";await im.decode();g.drawImage(im,38,26,56,56)}catch{}
  txt("Pepegun Analytics",105,52,30,palette.text,true,620);txt(words[currentLang].subtitle,105,75,15,palette.muted,false,620);
- txt(label,725,44,15,palette.green,true,435);txt(words[currentLang].asOf+" "+time(asOf)+(old?" · "+words[currentLang].stale:""),725,68,13,palette.muted,false,435);
+ txt(label,725,44,15,palette.green,true,435);if(trust)txt(words[currentLang][trust],725,88,12,trust==="trustMismatch"?"#ffb16b":palette.muted,true,435);txt(words[currentLang].asOf+" "+time(asOf)+(old?" · "+words[currentLang].stale:""),725,68,13,palette.muted,false,435);
  const loc=currentLang==="ru"?"ru-RU":"en-US",n=x=>new Intl.NumberFormat(loc).format(x),f=x=>compactAmount(x,loc,4);
  const tiles=[[words[currentLang].wallets,n(snapshot.wallets)],[words[currentLang].paying,n(snapshot.paying)],[words[currentLang].revenue,f(snapshot.fee)+" GRAM"],[words[currentLang].payments,n(snapshot.count)]];
  tiles.forEach(([k,v],i)=>{const x=38+i*284;rect(x,100,272,103,palette.card);g.textAlign="center";txt(k,x+136,130,15,palette.muted,false,242);txt(v,x+136,173,32,i===0?palette.green:palette.text,true,242);g.textAlign="left"});
@@ -545,8 +564,8 @@ async function exportPng(){
 async function refresh(force=false){
  if(busy)return;
  busy=true;error=false;progress=null;exportError=false;updateStatus();
- try{const next=await sync(cache,p=>{progress=p;updateStatus()},force);cache=next;storageError=!(await saveCache(next));}
- catch(e){error=true;console.warn("Pepegun sync:",e)}
+ try{const next=await sync(cache,p=>{progress=p;updateStatus()},force);cache={...next,audit:mergeAudit(next,cache?.audit)};storageError=!(await saveCache(cache));}
+ catch(e){error=true;if(cache&&e.audit){cache={...cache,audit:mergeAudit(cache,e.audit)};storageError=!(await saveCache(cache))}console.warn("Pepegun sync:",e)}
  finally{busy=false;render()}
 }
 $("language").addEventListener("click",()=>{lang=lang==="ru"?"en":"ru";try{localStorage.setItem("pepegun-lang",lang)}catch{}render()});
@@ -560,5 +579,5 @@ $("audit-check").addEventListener("click",auditSources);$("refresh").addEventLis
 window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(renderCharts,100)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!busy&&(!cache||Date.now()-cache.asOf>=REFRESH))refresh()});
 setInterval(()=>{if(!busy&&document.visibilityState==="visible")refresh()},REFRESH);setInterval(updateStatus,60000);
-const updateCardExport=setupCardExport(()=>({valid:!!m&&!!cache,lang,period:rangeNote(),asOf:cache?time(cache.asOf):"",anchor:m?.anchor||"",stale:stale()}),download);
-render();loadCache().then(async c=>{if(c){cache=c;render()}const seed=await loadSeed();cache=selectSnapshot(c,seed);if(cache&&seed&&seed.tip===cache.tip&&seed.tipHash===cache.tipHash&&validAudit(seed.audit,cache.tip)&&(!cache.audit||seed.audit.asOf>cache.audit.asOf))cache.audit=seed.audit;busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});
+const updateCardExport=setupCardExport(()=>({valid:!!m&&!!cache,lang,period:rangeNote(),asOf:cache?time(cache.asOf):"",anchor:m?.anchor||"",stale:stale(),trust:trustLabel()?tr(trustLabel()):"",suspect:auditTrust(cache)==="mismatch"}),download);
+render();loadCache().then(async c=>{if(c){cache=c;render()}const seed=await loadSeed();cache=selectSnapshot(c,seed);busy=false;render();refresh()}).catch(()=>{busy=false;refresh()});

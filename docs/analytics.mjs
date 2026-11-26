@@ -18,10 +18,11 @@ export function mapTx(x,source){
  const im=x.in_msg,decoded=tc?im?.message_content?.decoded:im?.decoded_body;
  const isText=tc?(decoded?.type==="text_comment"||decoded?.["@type"]==="text_comment"):im?.decoded_op_name==="text_comment";
  const comment=isText?(tc?decoded?.comment:decoded?.text):null;
- const lt=unsigned(x.lt),prev=unsigned(x.prev_trans_lt??(tc?null:"0"));
+ const lt=unsigned(x.lt),prev=unsigned(x.prev_trans_lt);
+ const prevHash=x.prev_trans_hash==null?null:hex(x.prev_trans_hash);
  const m=im?{s:raw(tc?im.source:im.source?.address),v:im.value==null?"0":unsigned(im.value),b:im.bounced===true,c:typeof comment==="string"?comment:null}:null;
  const success=tc?!aborted:!aborted&&x.success;
- return {h:hex(x.hash),lt,prev,t,success,m};
+ return {h:hex(x.hash),lt,prev,prevHash,t,success,m};
 }
 export function commentKind(comment){
  if(typeof comment!=="string"||!comment.toLowerCase().includes("pepegun"))return null;
@@ -44,7 +45,43 @@ export function minimizeTransaction(t){
 export function packTransaction(t){const r=minimizeTransaction(t);return [r.h,r.lt,r.prev,r.t,r.success?1:0,r.m?[r.m.s,r.m.v,r.m.c]:null,r.a?1:0]}
 export function unpackTransaction(a){if(!Array.isArray(a)||a.length!==7||![0,1].includes(a[4])||![0,1].includes(a[6])||(a[5]!==null&&(!Array.isArray(a[5])||a[5].length!==3)))throw Error("Invalid snapshot row");return {h:a[0],lt:a[1],prev:a[2],t:a[3],success:a[4]===1,m:a[5]?{s:a[5][0],v:a[5][1],c:a[5][2],b:false}:null,a:a[6]===1}}
 export function ordered(txs){const m=new Map();for(const t of txs)m.set(t.h,t);return [...m.values()].sort((a,b)=>compareLt(a.lt,b.lt))}
-export function verify(txs,prev){if(!txs.length)return false;let p=prev;for(const tx of txs){if(tx.prev!==p||compareLt(tx.lt,p)<=0)return false;p=tx.lt}return true}
+const hashPattern=/^[0-9a-f]{64}$/;
+const ltPattern=/^(0|[1-9]\d*)$/;
+const ZERO_HASH="0".repeat(64);
+export function verify(txs,prev,prevHash=prev==="0"?ZERO_HASH:null){
+ if(!txs.length||typeof prev!=="string"||!ltPattern.test(prev))return false;
+ const seen=new Set();let p=prev,h=prevHash;
+ for(const tx of txs){
+  if(!tx||typeof tx.h!=="string"||!hashPattern.test(tx.h)||seen.has(tx.h)||typeof tx.lt!=="string"||!ltPattern.test(tx.lt)||tx.prev!==p||compareLt(tx.lt,p)<=0)return false;
+  if(tx.prevHash!=null&&(typeof tx.prevHash!=="string"||!hashPattern.test(tx.prevHash)||(h!==null&&tx.prevHash!==h)))return false;
+  seen.add(tx.h);p=tx.lt;h=tx.h;
+ }
+ return true;
+}
+function validHistory(c){
+ if(!Array.isArray(c.history)||c.history.length!==c.scanned)return false;
+ const seen=new Set(),byLt=new Map();let prev="0";
+ for(const row of c.history){
+  if(!Array.isArray(row)||row.length!==2||typeof row[0]!=="string"||!ltPattern.test(row[0])||compareLt(row[0],prev)<=0||typeof row[1]!=="string"||!hashPattern.test(row[1])||seen.has(row[1]))return false;
+  prev=row[0];seen.add(row[1]);byLt.set(row[0],row[1]);
+ }
+ return prev===c.tip&&c.history.at(-1)?.[1]===c.tipHash&&c.rows.every(row=>byLt.get(row.lt)===row.h);
+}
+function sameHistory(a,b){return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every(([lt,h],i)=>lt===b[i][0]&&h===b[i][1])}
+export function historyConflict(a,b){
+ if(!a||!b)return false;
+ if(a.tip===b.tip&&a.tipHash!==b.tipHash)return true;
+ if(!Array.isArray(a.history)||!Array.isArray(b.history))return false;
+ const n=Math.min(a.history.length,b.history.length);
+ for(let i=0;i<n;i++)if(a.history[i][0]!==b.history[i][0]||a.history[i][1]!==b.history[i][1])return true;
+ return false;
+}
+function overlapConflict(previous,txs){
+ const history=previous.history;
+ const known=new Map((history||[[previous.tip,previous.tipHash]]).map(([lt,h],i)=>[lt,{h,prev:history?(history[i-1]?.[0]||"0"):null,prevHash:history?(history[i-1]?.[1]||ZERO_HASH):null}]));
+ return txs.some(t=>{const row=known.get(t.lt);return !!row&&(row.h!==t.h||(row.prev!==null&&t.prev!==row.prev)||(row.prevHash!==null&&t.prevHash!=null&&t.prevHash!==row.prevHash))});
+}
+
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 async function json(url,progress){
  let last;
@@ -79,55 +116,99 @@ export async function download(source,after,progress){
  const {size,delay}=settings[source],m=new Map();let cursor=null,pages=0;
  for(;;){
   const page=await getPage(source,cursor,after,size,progress);let added=0,oldest=null;
-  for(const t of page){if(!m.has(t.h))added++;m.set(t.h,t);if(oldest===null||compareLt(t.lt,oldest)<0)oldest=t.lt}
+  for(const t of page){
+   const prior=m.get(t.h);
+   if(prior){if(JSON.stringify(prior)!==JSON.stringify(t))throw Error("Conflicting duplicate transaction")}
+   else {added++;m.set(t.h,t)}
+   if(oldest===null||compareLt(t.lt,oldest)<0)oldest=t.lt;
+  }
   progress?.({source,pages:++pages,scanned:m.size});
-  if(page.length<size||!added||!oldest)break;
-  if(cursor&&compareLt(oldest,cursor)>=0)throw Error("Pagination stopped advancing");
+  if(page.length<size)break;
+  if(!added||!oldest||(cursor&&compareLt(oldest,cursor)>=0))throw Error("Pagination stopped advancing");
   cursor=oldest;await wait(delay);
  }
  return ordered([...m.values()]);
 }
+export const AUDIT_SCOPE="full-history-v1";
+export function auditResult(snapshot,status,extra={}){
+ return {...extra,status,tip:snapshot.tip,tipHash:snapshot.tipHash,scope:AUDIT_SCOPE,asOf:Date.now()};
+}
+export function auditTrust(c){
+ const a=c?.audit;
+ if(!c||!validAudit(a,c.tip))return "unchecked";
+ if(a.status==="mismatch")return "mismatch";
+ if(a.status==="unavailable"||a.scope!==AUDIT_SCOPE||!c.history||!a.tipHash||c.history.find(row=>row[0]===a.tip)?.[1]!==a.tipHash)return "unavailable";
+ return a.tip===c.tip?"match":"prior";
+}
+// A failed/unavailable retry cannot erase an established disagreement.
+// A full-history match at the same or a later tip can supersede it.
+export function mergeAudit(c,...candidates){
+ if(!c)return null;
+ const checks=[c.audit,...candidates].filter(a=>validAudit(a,c.tip));
+ const usable=a=>a.status!=="match"||(a.scope===AUDIT_SCOPE&&c.history?.find(row=>row[0]===a.tip)?.[1]===a.tipHash&&!!a.tipHash);
+ const mismatch=checks.filter(a=>a.status==="mismatch").sort((a,b)=>b.asOf-a.asOf)[0];
+ const matches=checks.filter(a=>a.status==="match"&&usable(a)).sort((a,b)=>compareLt(b.tip,a.tip)||b.asOf-a.asOf);
+ const latest=checks.sort((a,b)=>b.asOf-a.asOf||compareLt(b.tip,a.tip))[0];
+ if(mismatch&&!matches.some(a=>compareLt(a.tip,mismatch.tip)>=0&&a.asOf>mismatch.asOf))return mismatch;
+ if(latest?.status==="match"&&!usable(latest))return matches[0]||latest;
+ return latest||null;
+}
 export function validAudit(a,tip){
- return !!a&&["match","mismatch","unavailable"].includes(a.status)&&typeof a.tip==="string"&&/^\d+$/.test(a.tip)&&compareLt(a.tip,tip)<=0&&Number.isFinite(a.asOf)&&a.asOf>0&&a.asOf<=Date.now()+60000;
+ return !!a&&["match","mismatch","unavailable"].includes(a.status)&&typeof a.tip==="string"&&/^\d+$/.test(a.tip)&&compareLt(a.tip,tip)<=0&&Number.isFinite(a.asOf)&&a.asOf>0&&a.asOf<=Date.now()+60000&&(a.scope===undefined||a.scope===AUDIT_SCOPE)&&(a.tipHash===undefined||(typeof a.tipHash==="string"&&hashPattern.test(a.tipHash)));
 }
 export function validCache(c){
  if(!c||c.version!==VERSION||c.address!==RAW||!["toncenter","tonapi"].includes(c.source)||!Array.isArray(c.rows)||typeof c.tip!=="string"||!/^\d+$/.test(c.tip)||!Number.isFinite(c.asOf)||c.asOf<=0||c.asOf>Date.now()+60000||!Number.isInteger(c.scanned)||c.scanned<=0||!Number.isInteger(c.ambiguous)||c.ambiguous<0||c.rows.length+c.ambiguous>c.scanned||typeof c.tipHash!=="string"||!/^[0-9a-f]{64}$/.test(c.tipHash)||!Number.isSafeInteger(c.tipTime)||!Number.isSafeInteger(c.firstTime)||c.firstTime<=0||c.tipTime<c.firstTime||c.tipTime*1000>c.asOf)return false;
  if(c.audit!=null&&!validAudit(c.audit,c.tip))return false;
  const seen=new Set(),lt=new Set();
- return c.rows.every(r=>{if(!r||typeof r.h!=="string"||!/^[0-9a-f]{64}$/.test(r.h)||seen.has(r.h)||typeof r.lt!=="string"||!/^\d+$/.test(r.lt)||lt.has(r.lt)||compareLt(r.lt,c.tip)>0||!Number.isSafeInteger(r.t)||r.t<c.firstTime||r.t>c.tipTime||!raw(r.s)||r.s!==raw(r.s)||r.s===RAW||typeof r.v!=="string"||!/^\d+$/.test(r.v)||BigInt(r.v)<=0n||!["fee","other"].includes(r.k)||typeof r.d!=="string"||r.d.length>64)return false;seen.add(r.h);lt.add(r.lt);return true});
+ const validRows=c.rows.every(r=>{if(!r||typeof r.h!=="string"||!/^[0-9a-f]{64}$/.test(r.h)||seen.has(r.h)||typeof r.lt!=="string"||!/^\d+$/.test(r.lt)||lt.has(r.lt)||compareLt(r.lt,c.tip)>0||!Number.isSafeInteger(r.t)||r.t<c.firstTime||r.t>c.tipTime||!raw(r.s)||r.s!==raw(r.s)||r.s===RAW||typeof r.v!=="string"||!/^\d+$/.test(r.v)||BigInt(r.v)<=0n||!["fee","other"].includes(r.k)||typeof r.d!=="string"||r.d.length>64)return false;seen.add(r.h);lt.add(r.lt);return true});
+ return validRows&&(c.history===undefined||validHistory(c));
 }
 export function cacheFrom(txs,source,previous=null,now=Date.now()){
  const m=new Map((previous?.rows||[]).map(r=>[r.h,r]));
  for(const tx of txs){const r=classify(tx);if(r)m.set(r.h,r)}
- return {version:VERSION,address:RAW,source,tip:txs.at(-1)?.lt||previous?.tip,tipHash:txs.at(-1)?.h||previous?.tipHash,tipTime:txs.at(-1)?.t||previous?.tipTime,audit:previous?.audit??null,firstTime:previous?.firstTime??txs[0]?.t,asOf:now,scanned:(previous?.scanned||0)+txs.length,ambiguous:(previous?.ambiguous||0)+txs.filter(t=>t.a===true||(commentKind(t.m?.c)?.k==="ambiguous"&&t.success&&t.m?.s&&t.m.s!==RAW&&!t.m.b&&BigInt(t.m.v)>0n)).length,rows:[...m.values()].sort((a,b)=>a.t-b.t||compareLt(a.lt,b.lt))};
+ const history=previous&&!previous.history?undefined:[...(previous?.history||[]),...txs.map(t=>[t.lt,t.h])];
+ return {version:VERSION,address:RAW,source,...(history?{history}:{}),tip:txs.at(-1)?.lt||previous?.tip,tipHash:txs.at(-1)?.h||previous?.tipHash,tipTime:txs.at(-1)?.t||previous?.tipTime,audit:previous?.audit??null,firstTime:previous?.firstTime??txs[0]?.t,asOf:now,scanned:(previous?.scanned||0)+txs.length,ambiguous:(previous?.ambiguous||0)+txs.filter(t=>t.a===true||(commentKind(t.m?.c)?.k==="ambiguous"&&t.success&&t.m?.s&&t.m.s!==RAW&&!t.m.b&&BigInt(t.m.v)>0n)).length,rows:[...m.values()].sort((a,b)=>a.t-b.t||compareLt(a.lt,b.lt))};
 }
 export async function sync(previous,progress,force=false){
- let last;
+ let last,disagreement=null;
+ const conflict=message=>Object.assign(Error(message),{sourceMismatch:true});
+ const retain=next=>({...next,audit:mergeAudit(next,disagreement)});
  for(const source of ["toncenter","tonapi"]){
   try{
-   if(!force&&validCache(previous)){
+   if(!force&&validCache(previous)&&previous.history){
     const all=await download(source,previous.tip,progress),fresh=all.filter(t=>compareLt(t.lt,previous.tip)>0);
-    if(fresh.length&&verify(fresh,previous.tip)){
-     const anchor=all.find(t=>t.lt===previous.tip);
-     if(anchor&&anchor.h!==previous.tipHash)throw Error("Indexer disagrees at cached tip");
-     const next=cacheFrom(fresh,source,previous);if(!validCache(next))throw Error("Invalid incremental snapshot");return next;
+    if(overlapConflict(previous,all))throw conflict("Indexer disagrees at cached tip");
+    if(fresh.length){
+     const anchors=all.filter(t=>t.lt===previous.tip);
+     if(anchors.length>1||anchors.some(t=>t.h!==previous.tipHash))throw conflict("Indexer disagrees at cached tip");
+     if(fresh[0].prev===previous.tip&&fresh[0].prevHash!=null&&fresh[0].prevHash!==previous.tipHash)throw conflict("Indexer disagrees with cached predecessor");
+     if((anchors.length===1||fresh[0].prevHash===previous.tipHash)&&verify(fresh,previous.tip,previous.tipHash)){
+      const next=cacheFrom(fresh,source,previous);if(!validCache(next))throw Error("Invalid incremental snapshot");return retain(next);
+     }
     }
     if(!fresh.length){
      const head=await getPage(source,null,null,1,progress);
-     if(head.length===1&&head[0].lt===previous.tip&&head[0].h===previous.tipHash)return cacheFrom([],source,previous);
+     if(overlapConflict(previous,head))throw conflict("Indexer disagrees at cached head");
+     if(head.length===1&&head[0].lt===previous.tip&&head[0].h===previous.tipHash)return retain(cacheFrom([],source,previous));
     }
    }
    const txs=await download(source,null,progress);
+   if(validCache(previous)&&overlapConflict(previous,txs))throw conflict("Indexer disagrees with cached history");
    if(!verify(txs,"0"))throw Error("Incomplete or empty full history");
-   if(validCache(previous)){const anchor=txs.find(t=>t.lt===previous.tip);if(!anchor||anchor.h!==previous.tipHash)throw Error("Indexer behind or inconsistent with last verified snapshot");}
-   const next=cacheFrom(txs,source);if(!validCache(next))throw Error("Invalid full snapshot");if(validCache(previous)&&previous.audit&&typeof previous.audit.tip==="string"&&/^\d+$/.test(previous.audit.tip)&&compareLt(previous.audit.tip,next.tip)<=0)next.audit=previous.audit;return next;
-  }catch(e){last=e}
+   if(validCache(previous)){
+    const anchor=txs.find(t=>t.lt===previous.tip);
+    if(!anchor){if(compareLt(txs.at(-1).lt,previous.tip)>=0)throw conflict("Indexer omitted cached tip");throw Error("Indexer behind cached snapshot")}
+    if(previous.history&&!sameHistory(previous.history,txs.filter(t=>compareLt(t.lt,previous.tip)<=0).map(t=>[t.lt,t.h])))throw conflict("Indexer disagrees with cached history");
+   }
+   const next=cacheFrom(txs,source);if(!validCache(next))throw Error("Invalid full snapshot");if(validCache(previous)&&previous.audit&&typeof previous.audit.tip==="string"&&/^\d+$/.test(previous.audit.tip)&&compareLt(previous.audit.tip,next.tip)<=0)next.audit=previous.audit;return retain(next);
+  }catch(e){last=e;if(e.sourceMismatch&&validCache(previous))disagreement=auditResult(previous,"mismatch",{source})}
  }
+ if(disagreement)throw Object.assign(last||Error("Indexer disagreement"),{audit:disagreement});
  throw last||Error("Both sources unavailable");
 }
 function db(){return new Promise((resolve,reject)=>{const r=indexedDB.open("pepegun-analytics-v2",1);r.onupgradeneeded=()=>r.result.createObjectStore("data");r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 export async function loadCache(){let d;try{d=await db();const c=await new Promise((resolve,reject)=>{const r=d.transaction("data").objectStore("data").get("current");r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});return validCache(c)?c:null}catch{return null}finally{d?.close()}}
-export async function saveCache(c){let d;try{if(!validCache(c))return false;d=await db();await new Promise((resolve,reject)=>{const t=d.transaction("data","readwrite"),store=t.objectStore("data"),r=store.get("current");r.onsuccess=()=>{const old=r.result;if(!validCache(old)||compareLt(c.tip,old.tip)>0||(c.tip===old.tip&&c.tipHash===old.tipHash&&c.asOf>=old.asOf))store.put(c,"current")};t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error)});return true}catch{return false}finally{d?.close()}}
+export async function saveCache(c){let d;try{if(!validCache(c))return false;d=await db();await new Promise((resolve,reject)=>{const t=d.transaction("data","readwrite"),store=t.objectStore("data"),r=store.get("current");r.onsuccess=()=>{const old=r.result;if(!validCache(old)){store.put(c,"current");return}const newer=compareLt(c.tip,old.tip)>0||(c.tip===old.tip&&c.tipHash===old.tipHash&&((!!c.history&&!old.history)||c.asOf>=old.asOf));const chosen=newer?c:old;store.put({...chosen,audit:mergeAudit(chosen,old.audit,c.audit)},"current")};t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error)});return true}catch{return false}finally{d?.close()}}
 export function resolveRange(preset,now,first,custom){
  const today=dayIndex(now),end=now+1;let from;
  if(preset==="all")from=dayIndex(first??now)*DAY;
@@ -159,17 +240,20 @@ export function metrics(rows,range,now){
  return {wallets:all.active.size,paying:all.paying.size,newWallets,returning:all.active.size-newWallets,fee:all.fee,count:all.count,other:all.other,largest:all.largest,venues:[...venues].map(([label,a])=>({label,fee:a.fee,count:a.count,wallets:a.active.size})).sort((a,b)=>a.fee>b.fee?-1:a.fee<b.fee?1:a.label.localeCompare(b.label)),activity:Object.fromEntries(Object.entries(activity).map(([k,v])=>[k,v.size])),anchor:dayKey(anchor)};
 }
 export function compareSnapshots(snapshot,other){
+ if(!validCache(snapshot)||!validCache(other))return false;
  const byHash=new Map(other.rows.map(r=>[r.h,r]));
- return snapshot.tip===other.tip&&snapshot.tipHash===other.tipHash&&snapshot.scanned===other.scanned&&snapshot.ambiguous===other.ambiguous&&snapshot.rows.length===other.rows.length&&!snapshot.rows.some(r=>{const a=byHash.get(r.h);return !a||["lt","t","s","v","k","d"].some(k=>r[k]!==a[k])});
+ return sameHistory(snapshot.history,other.history)&&snapshot.tip===other.tip&&snapshot.tipHash===other.tipHash&&snapshot.scanned===other.scanned&&snapshot.ambiguous===other.ambiguous&&snapshot.rows.length===other.rows.length&&!snapshot.rows.some(r=>{const a=byHash.get(r.h);return !a||["lt","t","s","v","k","d"].some(k=>r[k]!==a[k])});
 }
 export async function crossCheck(snapshot,progress){
  if(!validCache(snapshot))throw Error("No verified snapshot");
  const source=snapshot.source==="toncenter"?"tonapi":"toncenter";
+ if(!snapshot.history)return auditResult(snapshot,"unavailable",{source});
  const txs=await download(source,null,progress);
  const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
- if(!verify(upto,"0")||upto.at(-1)?.lt!==snapshot.tip)return {status:"unavailable",source,asOf:Date.now(),tip:snapshot.tip};
+ if(overlapConflict(snapshot,upto))return auditResult(snapshot,"mismatch",{source});
+ if(!verify(upto,"0")||upto.at(-1)?.lt!==snapshot.tip)return auditResult(snapshot,"unavailable",{source});
  const other=cacheFrom(upto,source,null,snapshot.asOf);
- return {status:compareSnapshots(snapshot,other)?"match":"mismatch",source,asOf:Date.now(),tip:snapshot.tip,scanned:other.scanned,rows:other.rows.length};
+ return auditResult(snapshot,compareSnapshots(snapshot,other)?"match":"mismatch",{source,scanned:other.scanned,rows:other.rows.length});
 }
 export function exact(n){const q=BigInt(n),s=q<0n?"-":"",v=q<0n?-q:q;return s+(v/1000000000n)+"."+(v%1000000000n).toString().padStart(9,"0")}
 export function amount(n,digits=2,locale="en",trim=false){
