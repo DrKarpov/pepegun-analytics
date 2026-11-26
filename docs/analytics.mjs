@@ -299,12 +299,22 @@ async function incrementalAudit(snapshot,checkpoint,source,progress,signal){
  checkAbort(signal);
  const match=()=>matchedAudit(snapshot,source,proof.fullAt,"incremental",snapshot.scanned,snapshot.rows.length,signal);
  const mismatch=()=>auditResult(snapshot,"mismatch",{source});
+ // Also examine any already-confirmed rows the provider actually returns.
+ // A new decoded classification disagreement must not be ignored just
+ // because the transaction identity was verified in an older full audit.
+ const prefixRows=new Map(checkpoint.rows.map(r=>[r.lt,r]));
+ const changedPrefixRow=txs=>txs.some(tx=>{
+  if(compareLt(tx.lt,checkpoint.tip)>0)return false;
+  const row=prefixRows.get(tx.lt),observed=classify(tx);
+  return JSON.stringify(row?canonicalRows([row])[0]:null)!==JSON.stringify(observed?canonicalRows([observed])[0]:null);
+ });
  // For an unchanged tip, independently verify the alternate indexer's head.
  if(checkpoint.tip===snapshot.tip){
   if(!compareSnapshots(checkpoint,snapshot)||checkpoint.tipTime!==snapshot.tipTime)return null;
   const head=await getPage(source,null,null,1,progress,signal);
   progress?.({source,pages:1,scanned:head.length});
   if(overlapConflict(snapshot,head))return mismatch();
+  if(changedPrefixRow(head))return null;
   if(head.length===1&&head[0].lt===checkpoint.tip&&head[0].h===checkpoint.tipHash)return match();
   if(!head.length||compareLt(head[0].lt,checkpoint.tip)<0)return null;
  }
@@ -313,6 +323,7 @@ async function incrementalAudit(snapshot,checkpoint,source,progress,signal){
  const txs=await download(source,checkpoint.tip,progress,signal);
  const upto=txs.filter(t=>compareLt(t.lt,snapshot.tip)<=0);
  if(overlapConflict(snapshot,upto))return mismatch();
+ if(changedPrefixRow(upto))return null;
  const knownPrefix=new Set(checkpoint.history.map(row=>row[0]));
  if(upto.some(t=>compareLt(t.lt,checkpoint.tip)<=0&&!knownPrefix.has(t.lt)))return null;
  const anchor=txs.find(t=>t.lt===checkpoint.tip);
