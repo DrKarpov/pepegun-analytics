@@ -82,6 +82,29 @@ try{
    assert.ok((await page.evaluate(()=>window.__canvasText)).some(t=>t.includes("Источники расходятся")));
    const card=await readDownload(page,"#card-export-download");
    assert.equal(card.subarray(1,4).toString(),"PNG");
+   assert.equal(await page.locator("#notice").isVisible(),false);
+   // Fresh independent context for the migration/unavailable scenario.
+   const migration=await browser.newContext({viewport:{width:393,height:852},locale:"ru-RU"});
+   await migration.addInitScript(()=>localStorage.setItem("pepegun-lang","ru"));
+   const legacySeed={...snapshot,audit:{status:"match",tip:cache.tip,asOf:now}};
+   await migration.route("https://raw.githubusercontent.com/**/snapshot.json",route=>route.fulfill({json:legacySeed}));
+   await migration.route("https://toncenter.com/**",route=>{
+    const u=new URL(route.request().url());
+    return ok(route,u.searchParams.has("start_lt")?[]:u.searchParams.get("limit")==="1"?[tc(txs.at(-1))]:txs.slice().reverse().map(tc));
+   });
+   await migration.route("https://tonapi.io/**",deny);
+   const legacyPage=await migration.newPage();
+   await legacyPage.goto(url);await waitStatus(legacyPage,"Ожидается сверка");
+   assert.equal(await legacyPage.locator("#notice").isVisible(),false);
+   const top=await legacyPage.locator("#overview").evaluate(e=>e.getBoundingClientRect().top);
+   await legacyPage.locator("#refresh").click();
+   assert.equal(await legacyPage.locator("#notice").isVisible(),false);
+   await waitStatus(legacyPage,"Ожидается сверка");
+   assert.equal(await legacyPage.locator("#overview").evaluate(e=>e.getBoundingClientRect().top),top);
+   await legacyPage.locator("#method-section summary").click();
+   await legacyPage.locator("#audit-check").click();await waitStatus(legacyPage,"Сверка недоступна");
+   assert.equal(await legacyPage.locator("#notice").isVisible(),false);
+   await migration.close();
    assert.deepEqual(errors,[]);
    await ctx.close();
    console.log(name,"P1 trust states, bilingual viewports, CSV and PNG verified");
