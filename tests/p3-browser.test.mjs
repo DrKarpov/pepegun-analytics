@@ -129,6 +129,52 @@ try{
      assert.deepEqual(await pngPixels(b.page,before.png,after.png),{sameSize:true,ratio:0},name+" "+lang+" "+id+" PNG pixels");
     }
    }
+   // Transaction navigation must never create a second time range.
+   // Explicit fixture IDs, independent of the production range/filter helpers.
+   const txCases=[
+    ["all",[1,2,3,4,5,6,7,8,9]],
+    ["30d",[4,5,6,7,8,9]],
+    ["7d",[5,6,7,8,9]],
+    ["24h",[8,9]],
+    ["6h",[8,9]],
+    ["custom",[4,5,6]]
+   ];
+   const page=b.page;
+   await page.setViewportSize({width:393,height:900});
+   for(const lang of ["en","ru"]){
+    if(await page.locator("html").getAttribute("lang")!==lang)await page.locator("#language").click();
+    for(const [preset,ids] of txCases){
+     await page.locator('[data-range="'+preset+'"]').click();
+     if(preset==="custom"){
+      await page.locator("#from").fill("2026-11-14");
+      await page.locator("#to").fill("2026-11-22");
+      await page.locator("#to").dispatchEvent("change");
+     }
+     const label=name+" "+lang+" "+preset;
+     async function checkType(type){
+      const expected=ids.filter(i=>type==="all"||(type==="other"?i===4:i!==4)).slice().reverse().map(i=>"https://tonviewer.com/transaction/"+hash(i));
+      assert.deepEqual(await page.locator("#tx-list .tx-row a").evaluateAll(links=>links.map(a=>a.href)),expected,label+" "+type+" transaction rows");
+      assert.equal(await page.locator('[data-tx-type="'+type+'"]').getAttribute("aria-pressed"),"true",label+" type");
+      assert.equal(await page.locator('[data-range="'+preset+'"]').getAttribute("aria-pressed"),"true",label+" global range unchanged");
+      assert.equal(await page.locator("#tx-reset,#tx-context").count(),0,label+" no local period controls");
+     }
+     for(const chart of ["growth-chart","daily-chart","fees-chart"]){
+      const plot=page.locator("#"+chart+" .chart-plot");
+      const readout=page.locator("#"+chart+" .chart-readout");
+      const latest=await readout.innerText();
+      await plot.focus();await plot.press("ArrowLeft");
+      assert.notEqual(await readout.innerText(),latest,label+" "+chart+" point changed");
+      await page.locator("#"+chart+" .chart-tx").click();
+      assert.equal(await page.locator("#transaction-section").getAttribute("open"),"",label+" transaction panel opened");
+      await checkType(chart==="fees-chart"?"fee":"all");
+     }
+     for(const type of ["fee","all","other"]){
+      await page.locator('[data-tx-type="'+type+'"]').click();
+      await checkType(type);
+     }
+    }
+   }
+   console.log(name,"global-only transaction periods verified in both languages, all six ranges and three chart links");
    // Compare the hold-state presentation without racing the 600 ms gesture.
    // The existing interaction suite independently exercises actual hold/cancel.
    const hold=async page=>{

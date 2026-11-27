@@ -20,6 +20,8 @@ The initial 15-task reliability and maintainability roadmap is complete. The pro
 - Hold feedback begins at 240 ms; export at 600 ms; movement of 8 CSS px, scrolling, release, cancellation or secondary contact cancels pending hold. Keep pointer focus rings suppressed, keyboard access, and reduced-motion support. Chart scrolling must not select a point.
 - Startup uses the original logo, 400 ms minimum, 220 ms fade, 8-second fail-open, and reduced motion. It appears on initial navigation, not refresh.
 
+- Transaction list uses only the global time range; chart links open that list (growth/activity: all transfers; fees: fee transfers). Chart point selection changes readouts only. No local period reset or selected-interval label. The maintenance change is pending branch CI verification.
+
 ## Operations and limitations
 
 - The browser refreshes every 15 minutes while visible. Keep validated local/published fallback, sticky mismatch handling, ordered LT/hash continuity and anchor checks. Audit deadline: 240 seconds; manual audit remains full. Generator audit can reuse a digest-bound checkpoint for up to seven days before full revalidation.

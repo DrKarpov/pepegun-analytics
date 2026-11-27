@@ -1,6 +1,6 @@
-import {lang,tr,locale,num,pct,money,esc,time,txTime,utcDate,syncTime,shortDate,clock,intervalName,toggleLanguage} from "./i18n.mjs?v=39";
-import {createCharts} from "./charts.mjs?v=39";
-import {renderDashboardPng} from "./dashboard-export.mjs?v=39";
+import {lang,tr,locale,num,pct,money,esc,time,txTime,utcDate,syncTime,shortDate,clock,intervalName,toggleLanguage} from "./i18n.mjs?v=40";
+import {createCharts} from "./charts.mjs?v=40";
+import {renderDashboardPng} from "./dashboard-export.mjs?v=40";
 import {setupCardExport} from "./card-export.mjs?v=38";
 import {ADDRESS,REFRESH,STALE,dayIndex,dayKey,resolveRange,metrics,exact,sync,loadCache,saveCache,crossCheck,auditResult,auditTrust,mergeAudit} from "./analytics.mjs?v=35";
 import {extraMetrics,previousRange,change,adaptiveSeries,returnRates,rowsInRange,intervalCsv,loadSeed,selectSnapshot} from "./insights.mjs?v=35";
@@ -11,7 +11,7 @@ function intervalLabel(b){const a=b.start,z=b.end-1;if(hourly())return utcDate(a
 function exportDateLabel(){return range?(selected==="6h"||selected==="24h"?time(range.from)+" — "+time(range.to-1):dateLabel()+" · UTC"):""}
 const statusLabel=s=>s==="partial"?tr("partial"):s==="incomplete"?tr("incomplete"):tr("complete");
 let cache=null,selected="all",m=null,range=null,busy=true,error=false,storageError=false,exportError=false,progress=null,resizeTimer;
-let auditing=false,auditController=null,auditOutcome=null,auditProgress=null,series={kind:"day",bins:[]},txRange=null,txType="fee",txLimit=20,historyLimit=14;
+let auditing=false,auditController=null,auditOutcome=null,auditProgress=null,series={kind:"day",bins:[]},txType="fee",txLimit=20,historyLimit=14;
 const trustLabel=(trust=auditTrust(cache))=>({mismatch:"trustMismatch",prior:"trustPrior",unavailable:"trustUnavailable",unchecked:"trustUnchecked"}[trust]);
 function stale(){return !!cache&&(error||Date.now()-cache.asOf>STALE)}
 function language(){document.documentElement.lang=lang;document.querySelectorAll("[data-i]").forEach(el=>el.textContent=tr(el.dataset.i));const switchLabel=lang==="ru"?"Switch to English":"Переключить на русский";$("language").textContent=lang==="ru"?"EN":"RU";$("language").setAttribute("aria-label",switchLabel);$("language").title=switchLabel;$("refresh").setAttribute("aria-label",tr("refresh"));$("refresh").title=tr("refresh");$("filters").setAttribute("aria-label",tr("range"));$("tx-filters").setAttribute("aria-label",lang==="ru"?"Тип транзакции":"Transaction type");$("overview").setAttribute("aria-label",tr("overview"));$("active").setAttribute("aria-label",tr("active"));}
@@ -42,7 +42,6 @@ function render(){
  range=cache?resolveRange(selected,cache.asOf,cache.rows[0]?.t*1000||cache.asOf,{from:$("from").value,to:$("to").value}):null;
  m=cache&&range?metrics(cache.rows,range,cache.asOf):null;
  series=m?adaptiveSeries(cache.rows,range,cache.asOf):{kind:"day",bins:[]};
- if(txRange&&range){txRange={from:Math.max(txRange.from,range.from),to:Math.min(txRange.to,range.to)};if(txRange.to<=txRange.from)txRange=null}
  for(const id of ["growth-interval","activity-interval","fee-interval"])$(id).textContent=m?intervalName(series.kind)+" · UTC":"";
  $("range-note").textContent=rangeNote();
  $("custom").hidden=selected!=="custom";
@@ -125,16 +124,15 @@ async function auditSources(){
  }
 }
 function renderTransactions(){
- const r=txRange||range,valid=!!m&&!!r;
+ const r=range,valid=!!m&&!!r;
  $("tx-filters").querySelectorAll("button").forEach(b=>{b.disabled=!valid;b.setAttribute("aria-pressed",String(b.dataset.txType===txType))});
- $("tx-reset").hidden=!txRange;$("tx-context").textContent=valid&&txRange?tr("viewInterval")+": "+time(r.from)+" — "+time(r.to-1):"";
  if(!valid){$("tx-list").innerHTML=placeholder();$("tx-more").hidden=true;$("tx-count").textContent="";return}
  const rows=rowsInRange(cache.rows,r,txType),shown=rows.slice(0,txLimit);
  $("tx-count").textContent=tr("txShown")+" "+num(shown.length)+" "+tr("of")+" "+num(rows.length);
  $("tx-list").innerHTML=shown.length?'<div class="tx-list">'+shown.map(r=>'<article class="tx-row"><div><strong>'+esc(r.k==="fee"?tr("txTypeFee"):tr("txTypeOther"))+'</strong><small>'+esc(venueLabel(r.d))+'</small><small>'+esc(txTime(r.t*1000))+'</small></div><div class="tx-right"><strong title="'+esc(exact(r.v))+' GRAM">'+esc(money(r.v))+' GRAM</strong><a href="https://tonviewer.com/transaction/'+esc(r.h)+'" target="_blank" rel="noopener noreferrer">'+esc(tr("txLink"))+' ↗</a></div></article>').join("")+'</div>':'<p class="empty-note">'+esc(tr("txEmpty"))+'</p>';
  $("tx-more").hidden=shown.length>=rows.length;$("tx-more").textContent=tr("more");
 }
-function openTransactions(r,type){txRange=r;txType=type;txLimit=20;const d=$("transaction-section");d.open=true;renderTransactions();d.scrollIntoView({block:"start",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}
+function openTransactions(type){txType=type;txLimit=20;const d=$("transaction-section");d.open=true;renderTransactions();d.scrollIntoView({block:"start",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
 function exportCsv(){
  if(!m||!cache)return;
@@ -162,11 +160,10 @@ async function refresh(force=false){
  finally{busy=false;render()}
 }
 $("language").addEventListener("click",()=>{toggleLanguage();render()});
-document.querySelectorAll("[data-range]").forEach(b=>b.addEventListener("click",()=>{selected=b.dataset.range;historyLimit=14;txRange=null;txLimit=20;resetSelection();render()}));
-for(const id of ["from","to"])$(id).addEventListener("change",()=>{resetSelection();historyLimit=14;txRange=null;txLimit=20;render()});
+document.querySelectorAll("[data-range]").forEach(b=>b.addEventListener("click",()=>{selected=b.dataset.range;historyLimit=14;txLimit=20;resetSelection();render()}));
+for(const id of ["from","to"])$(id).addEventListener("change",()=>{resetSelection();historyLimit=14;txLimit=20;render()});
 $("more").addEventListener("click",()=>{historyLimit=historyLimit>=series.bins.length?14:historyLimit+30;renderDetails()});
 $("tx-filters").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{txType=b.dataset.txType;txLimit=20;renderTransactions()}));
-$("tx-reset").addEventListener("click",()=>{txRange=null;txLimit=20;renderTransactions()});
 $("tx-more").addEventListener("click",()=>{txLimit+=30;renderTransactions()});
 $("audit-check").addEventListener("click",auditSources);$("refresh").addEventListener("click",()=>refresh());$("resync").addEventListener("click",()=>refresh(true));$("csv").addEventListener("click",exportCsv);$("png").addEventListener("click",()=>{exportError=false;updateStatus();exportPng().catch(()=>{exportError=true;updateStatus()})});
 window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(renderCharts,100)});
