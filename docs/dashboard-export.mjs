@@ -1,6 +1,6 @@
 // Global dashboard PNG renderer, with a frozen input snapshot and no app state mutation.
 import {ADDRESS,compactAmount} from "./analytics.mjs?v=35";
-import {words,time} from "./i18n.mjs?v=39";
+import {words,time} from "./i18n.mjs?v=40";
 import {colors,barOpacity} from "./chart-style.mjs?v=39";
 export async function renderDashboardPng({snapshot,exportSeries,asOf,old,trust,label,currentLang}){
  const canvas=document.createElement("canvas");canvas.width=2400;canvas.height=1840;const g=canvas.getContext("2d");if(!g)throw Error("Canvas unavailable");g.scale(2,2);const W=1200,H=920;

@@ -1,5 +1,5 @@
 // SVG charts, point selection and touch/mouse gestures; no app-level mutable globals.
-import {tr,locale,num,money,esc} from "./i18n.mjs?v=39";
+import {tr,locale,num,money,esc} from "./i18n.mjs?v=40";
 import {colors,barOpacity} from "./chart-style.mjs?v=39";
 const $=id=>document.getElementById(id);
 export function createCharts({getSeries,placeholder,hourly,axisLabel,intervalLabel,statusLabel,openTransactions}){
@@ -47,7 +47,7 @@ function drawChart(id,data,series,kind,decimal){
  const graphic=root.querySelector("svg"),cursor=root.querySelector(".cursor"),readout=root.querySelector(".chart-readout");
  function focus(i){i=Math.max(0,Math.min(data.length-1,i));pointsState[id]=i;const r=data[i];pointBuckets[id]=i===data.length-1?null:r.bucket;cursor.setAttribute("x1",x(i));cursor.setAttribute("x2",x(i));readout.innerHTML='<strong>'+esc(intervalLabel(r))+'</strong>'+(isPartial(r)?" · "+esc(statusLabel(r.status)):"")+" · "+series.map(s=>esc(s.label)+": <strong>"+esc(s.key==="fee"?money(r.fee)+" GRAM":num(val(r,s)))+"</strong>").join(" · ")}
  const saved=pointBuckets[id];const index=saved==null?-1:data.findIndex(b=>b.bucket===saved);focus(index<0?data.length-1:index);
- root.querySelector(".chart-tx").addEventListener("click",()=>{const r=data[pointsState[id]??data.length-1];if(r)openTransactions({from:r.start,to:r.end},id==="fees-chart"?"fee":"all")});
+ root.querySelector(".chart-tx").addEventListener("click",()=>openTransactions(id==="fees-chart"?"fee":"all"));
  let gesture=null;
  const MOVE_LIMIT=8,HORIZONTAL_RATIO=1.25;
  function pointer(e){const rect=graphic.getBoundingClientRect();if(!rect.width)return;const px=(e.clientX-rect.left)*W/rect.width;const i=Math.max(0,Math.min(data.length-1,Math.floor((px-L)/cell)));if(pointsState[id]!==i)focus(i)}
