@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-11-26.
+Updated 2026-11-27.
 
 The initial 15-task reliability and maintainability roadmap is complete. The project is in maintenance; there is no open mandatory implementation stage.
 
@@ -20,7 +20,7 @@ The initial 15-task reliability and maintainability roadmap is complete. The pro
 - Hold feedback begins at 240 ms; export at 600 ms; movement of 8 CSS px, scrolling, release, cancellation or secondary contact cancels pending hold. Keep pointer focus rings suppressed, keyboard access, and reduced-motion support. Chart scrolling must not select a point.
 - Startup uses the original logo, 400 ms minimum, 220 ms fade, 8-second fail-open, and reduced motion. It appears on initial navigation, not refresh.
 
-- Transaction list uses only the global time range; chart links open that list (growth/activity: all transfers; fees: fee transfers). Chart point selection changes readouts only. No local period reset or selected-interval label. The maintenance change is pending branch CI verification.
+- Transaction list uses only the global time range; chart links open that list (growth/activity: all transfers; fees: fee transfers). Chart point selection changes readouts only. No local period reset or selected-interval label. Merged in [95ac6af](https://github.com/drkarpov/pepegun-analytics/commit/95ac6afcf7a91f52c2029b89ecccbbce0386e84a) after [CI 45978002236](https://github.com/drkarpov/pepegun-analytics/actions/runs/45978002236) passed both browser engines, all six periods, both languages, all three chart links, type filters and existing visual/export regressions. Post-merge CI and Pages deployment are separate checks.
 
 ## Operations and limitations
 
